@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Dark-mode tokens (validated dataviz palette) */
+  --page: #0d0d0d;
+  --surface-1: #1a1a19;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --gridline: #2c2c2a;
+  --baseline: #383835;
+  --border-hairline: rgba(255, 255, 255, 0.1);
+  --series-pos: #3987e5; /* diverging cool pole (positive z) */
+  --series-neg: #e66767; /* diverging warm pole (negative z) */
+  --delta-good: #0ca30c;
+  --delta-bad: #d03b3b;
+}
+
+body {
+  background:
+    radial-gradient(90rem 40rem at 70% -20%, rgba(57, 135, 229, 0.07), transparent 60%),
+    radial-gradient(70rem 35rem at 0% 10%, rgba(230, 103, 103, 0.04), transparent 55%),
+    var(--page);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+::selection {
+  background: rgba(57, 135, 229, 0.4);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--baseline) transparent;
+}
+
+/* Exchange ticker tape */
+.ticker {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 4%, black 96%, transparent);
+  mask-image: linear-gradient(90deg, transparent, black 4%, black 96%, transparent);
+}
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker-scroll 90s linear infinite;
+}
+.ticker:hover .ticker-track {
+  animation-play-state: paused;
+}
+@keyframes ticker-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none;
+  }
+}

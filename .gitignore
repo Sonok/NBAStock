@@ -1,0 +1,16 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+
+# Cached NBA data + headshots (refetchable)
+backend/app/data/
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Env + OS
+.env*
+.DS_Store
