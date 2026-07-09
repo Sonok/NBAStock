@@ -98,11 +98,16 @@ export default function FeedPanel({
           they happen.
         </p>
       ) : (
-        <ul className="mt-2">
-          {events.slice(0, 20).map((e) => (
-            <EventRow key={e.id} e={e} />
-          ))}
-        </ul>
+        // Scrolls internally (capped below viewport height) so the sticky
+        // rail never outgrows the screen; overscroll-contain keeps the list
+        // scroll from chaining into the page.
+        <div className="mt-2 max-h-[calc(100vh-14rem)] overflow-y-auto overscroll-contain pr-1 [mask-image:linear-gradient(to_bottom,black_calc(100%-20px),transparent)]">
+          <ul className="pb-4">
+            {events.slice(0, 20).map((e) => (
+              <EventRow key={e.id} e={e} />
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );
