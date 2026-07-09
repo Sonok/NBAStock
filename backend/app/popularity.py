@@ -94,6 +94,30 @@ def _player_views(
     return best
 
 
+def update_player_views(
+    session: requests.Session,
+    season: str,
+    player_id: int,
+    name: str,
+    days: int = 45,
+) -> int:
+    """Incremental per-player update: fetch the last `days` of attention and
+    upsert into the store. This is the async trickle's unit of work. Returns
+    the number of days written. Always touches views_updated_at (via the
+    upsert) so hopeless names don't hog the queue."""
+    from datetime import date, timedelta
+
+    from . import store
+
+    start_season, end = _season_window(season)
+    start = max(
+        start_season, (date.today() - timedelta(days=days)).strftime("%Y%m%d")
+    )
+    series = _player_views(session, name, start, end)
+    store.upsert_daily_views(season, player_id, series)
+    return len(series)
+
+
 def refresh(season: str = DEFAULT_SEASON) -> dict:
     """Fetch season pageviews for every cached player and write the cache."""
     from . import ingest  # late import to avoid a cycle

@@ -67,7 +67,8 @@ class PlayerInputs:
     triple_doubles: int
     plus_minus: float
     last10_game_score: float | None = None
-    wiki_views: int | None = None  # season Wikipedia pageviews (real popularity)
+    wiki_views: int | None = None  # season Wikipedia pageviews (fame display)
+    wiki_views_recent: int | None = None  # trailing ~30d pageviews (drives price)
 
 
 @dataclass
@@ -151,13 +152,18 @@ def price_players(players: list[PlayerInputs]) -> list[PricedPlayer]:
     star_z = _zscores([star_power(p) for p in pool])
 
     # Popularity: real attention (log pageviews — fame is power-law) blended
-    # with on-court star power. Players missing pageview data get the pool
+    # with on-court star power. Recent (trailing ~30d) views drive the price
+    # when available so attention swings actually move the market; season
+    # totals are the fallback. Players missing pageview data get the pool
     # median so they aren't punished for a bad name→article match.
-    with_views = [p.wiki_views for p in pool if p.wiki_views]
+    def _views(p: PlayerInputs) -> int | None:
+        return p.wiki_views_recent if p.wiki_views_recent is not None else p.wiki_views
+
+    with_views = [_views(p) for p in pool if _views(p)]
     if with_views:
         median_views = sorted(with_views)[len(with_views) // 2]
         wiki_z = _zscores(
-            [math.log10((p.wiki_views or median_views) + 1) for p in pool]
+            [math.log10((_views(p) or median_views) + 1) for p in pool]
         )
         pop_z = [0.65 * w + 0.35 * s for w, s in zip(wiki_z, star_z)]
     else:

@@ -48,8 +48,10 @@ def _date_range(start: str, end: str) -> list[str]:
 
 def daily_prices(season: str = ingest.DEFAULT_SEASON) -> dict:
     """{'dates': [...], 'prices': {player_id: [...]}} for the last HISTORY_DAYS."""
-    inputs = ingest.player_inputs(season)
-    daily = popularity.load_daily(season)
+    from . import store
+
+    inputs = store.player_inputs(season)
+    daily = store.get_daily_views(season)
     pool = [p for p in inputs if qualifies(p)]
     if not pool or not daily:
         return {"dates": [], "prices": {}}
@@ -101,8 +103,11 @@ def daily_prices(season: str = ingest.DEFAULT_SEASON) -> dict:
             price = BASE_PRICE * math.exp(SPREAD * composite)
             prices[p.player_id].append(max(MIN_PRICE, min(MAX_PRICE, price)))
 
-    # Anchor: scale each series so its last point equals the official price.
-    official = {pp.player_id: pp.price for pp in price_players(inputs)}
+    # Anchor: scale each series so its last point equals the live market
+    # price in the store (falling back to a fresh model run pre-seed).
+    official = store.price_map(season) or {
+        pp.player_id: pp.price for pp in price_players(inputs)
+    }
     for pid, series in prices.items():
         target = official.get(pid)
         if target and series and series[-1] > 0:
