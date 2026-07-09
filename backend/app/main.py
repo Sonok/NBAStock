@@ -58,7 +58,6 @@ app.add_middleware(
 # know (fresh rookies, two-way contracts) fall back to ESPN's headshots,
 # resolved by name via ESPN's public athlete index.
 NBA_CDN_HEADSHOT = "https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png"
-ESPN_INDEX = "https://sports.core.api.espn.com/v3/sports/basketball/nba/athletes?limit=1000&active=true"
 ESPN_HEADSHOT = "https://a.espncdn.com/i/headshots/nba/players/full/{espn_id}.png"
 HEADSHOT_DIR = ingest.DATA_DIR / "headshots"
 HEADSHOT_HEADERS = {
@@ -248,26 +247,6 @@ async def feed_stream(since_id: int = 0) -> StreamingResponse:
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
-def _espn_ids() -> dict[str, str]:
-    """Normalized player name -> ESPN athlete id, cached on disk."""
-    path = ingest.DATA_DIR / "espn_ids.json"
-    if path.exists():
-        return json.loads(path.read_text())
-    try:
-        r = requests.get(ESPN_INDEX, headers=HEADSHOT_HEADERS, timeout=20)
-        r.raise_for_status()
-        ids = {
-            ingest._normalize_name(item["displayName"]): str(item["id"])
-            for item in r.json().get("items", [])
-            if item.get("displayName") and item.get("id")
-        }
-    except requests.RequestException:
-        return {}
-    path.parent.mkdir(exist_ok=True)
-    path.write_text(json.dumps(ids))
-    return ids
-
-
 def _fetch_headshot(player_id: int) -> bytes | None:
     r = requests.get(
         NBA_CDN_HEADSHOT.format(player_id=player_id),
@@ -282,7 +261,7 @@ def _fetch_headshot(player_id: int) -> bytes | None:
     )
     if not player:
         return None
-    espn_id = _espn_ids().get(ingest._normalize_name(player["name"]))
+    espn_id = ingest.espn_id_index().get(ingest._normalize_name(player["name"]))
     if not espn_id:
         return None
     r = requests.get(

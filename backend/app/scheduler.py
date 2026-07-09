@@ -1,33 +1,48 @@
-"""Async background collectors + the periodic reprice loop.
+"""Async background collectors + the adaptive reprice loop.
 
-Runs inside the FastAPI process (started from the app's lifespan). Three
+Runs inside the FastAPI process (started from the app's lifespan). Four
 independent loops, all writing to the store:
 
-  trickle   every TRICKLE_SECONDS, refresh the stalest player's attention
-            data (one small Wikimedia call — the whole league cycles ~1-2x
-            a day without ever bursting)
+  trickle   refresh the stalest player's attention data, one small
+            Wikimedia call at a time
   stats     Basketball-Reference season stats, once per STATS_HOURS
-  reprice   every REPRICE_SECONDS, recompute all prices from whatever data
-            has landed since the last time step; movers become events
+  news      ESPN NBA headlines into the events feed
+  reprice   EVENT-DRIVEN, not wall-clock: collectors bump a data_version
+            in the store; this loop polls the version and only reprices
+            when inputs actually changed. A quiet offseason night produces
+            zero reprices; a burst of collection reprices within seconds.
 
-Disable with NBASTOCK_SCHEDULER=0 (tests, one-off scripts).
+Tempo scales collection to how alive the league is (NBASTOCK_TEMPO):
+  live    in-game cadence — trickle every 20s, reprice check every 15s
+          (in-season, a schedule check should flip this on during game
+          windows; offseason it's manual/demo)
+  normal  default day cadence
+  idle    quiet cadence for overnight / deep offseason
+
+Disable everything with NBASTOCK_SCHEDULER=0 (tests, one-off scripts).
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from datetime import datetime, timezone
 
 import requests
 
-from . import ingest, market, popularity, store
+from . import ingest, market, news, popularity, store
 
 log = logging.getLogger("nbastock.scheduler")
 
-TRICKLE_SECONDS = 90
-REPRICE_SECONDS = 300
+TEMPOS = {
+    "live": {"trickle": 20, "reprice_poll": 15},
+    "normal": {"trickle": 90, "reprice_poll": 60},
+    "idle": {"trickle": 600, "reprice_poll": 300},
+}
+TEMPO = TEMPOS.get(os.environ.get("NBASTOCK_TEMPO", "normal"), TEMPOS["normal"])
 STATS_HOURS = 24
+NEWS_SECONDS = 900
 SEASON = ingest.DEFAULT_SEASON
 
 
@@ -52,7 +67,7 @@ async def _trickle_loop() -> None:
                 log.info("trickle: %s (%d days)", p["name"], days)
         except Exception:
             log.exception("trickle failed")
-        await asyncio.sleep(TRICKLE_SECONDS)
+        await asyncio.sleep(TEMPO["trickle"])
 
 
 async def _stats_loop() -> None:
@@ -77,16 +92,33 @@ async def _stats_loop() -> None:
         await asyncio.sleep(3600)
 
 
-async def _reprice_loop() -> None:
+async def _news_loop() -> None:
     while True:
-        await asyncio.sleep(REPRICE_SECONDS)
         try:
+            added = await asyncio.to_thread(news.collect, SEASON)
+            if added:
+                log.info("news: %d new headlines", added)
+        except Exception:
+            log.exception("news collection failed")
+        await asyncio.sleep(NEWS_SECONDS)
+
+
+async def _reprice_loop() -> None:
+    last_version = store.get_meta("data_version")
+    while True:
+        await asyncio.sleep(TEMPO["reprice_poll"])
+        try:
+            version = store.get_meta("data_version")
+            if version == last_version:
+                continue  # nothing changed since the last time step
             summary = await asyncio.to_thread(market.reprice, SEASON)
-            if summary.get("events") or summary.get("snapshots"):
-                log.info("reprice: %s", summary)
+            last_version = version
+            log.info("reprice (data v%s): %s", version, summary)
         except Exception:
             log.exception("reprice failed")
 
 
 async def run() -> None:
-    await asyncio.gather(_trickle_loop(), _stats_loop(), _reprice_loop())
+    await asyncio.gather(
+        _trickle_loop(), _stats_loop(), _news_loop(), _reprice_loop()
+    )

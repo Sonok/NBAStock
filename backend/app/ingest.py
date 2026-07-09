@@ -90,6 +90,45 @@ def _nba_id_index() -> dict[str, int]:
     }
 
 
+ESPN_TEAMS_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams"
+ESPN_ROSTER_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team_id}/roster"
+
+
+def espn_id_index() -> dict[str, str]:
+    """Normalized player name -> ESPN athlete id, cached on disk. Used for
+    headshot fallback and to tie news articles to players. Aggregated from
+    the 30 team roster pages — ESPN's athlete index endpoint is partial."""
+    path = DATA_DIR / "espn_ids.json"
+    if path.exists():
+        return json.loads(path.read_text())
+    ids: dict[str, str] = {}
+    try:
+        teams = requests.get(ESPN_TEAMS_URL, headers=BROWSER_HEADERS, timeout=20)
+        teams.raise_for_status()
+        team_ids = [
+            t["team"]["id"]
+            for t in teams.json()["sports"][0]["leagues"][0]["teams"]
+        ]
+        for tid in team_ids:
+            r = requests.get(
+                ESPN_ROSTER_URL.format(team_id=tid),
+                headers=BROWSER_HEADERS,
+                timeout=20,
+            )
+            if r.status_code != 200:
+                continue
+            for a in r.json().get("athletes", []):
+                if a.get("displayName") and a.get("id"):
+                    ids[_normalize_name(a["displayName"])] = str(a["id"])
+            time.sleep(0.25)
+    except (requests.RequestException, KeyError):
+        if not ids:
+            return {}
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps(ids))
+    return ids
+
+
 def _get(url: str) -> str:
     resp = requests.get(url, headers=BROWSER_HEADERS, timeout=REQUEST_TIMEOUT)
     resp.raise_for_status()

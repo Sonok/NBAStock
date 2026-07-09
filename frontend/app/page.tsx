@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import FeedPanel from "@/components/FeedPanel";
 import PlayerCard from "@/components/PlayerCard";
 import { fetchPlayers, type PlayersResponse } from "@/lib/api";
 
@@ -107,28 +108,38 @@ export default function MarketPage() {
         </div>
       )}
 
-      {loading && !data && !error && (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-56 animate-pulse rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)]"
-            />
-          ))}
-        </div>
-      )}
+      <div className="mt-6 flex flex-col gap-6 lg:flex-row">
+        <div className="min-w-0 flex-1">
+          {loading && !data && !error && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-56 animate-pulse rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)]"
+                />
+              ))}
+            </div>
+          )}
 
-      {data && (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {data.players.map((p) => (
-            <PlayerCard key={p.player_id} player={p} />
-          ))}
-        </div>
-      )}
+          {data && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {data.players.map((p) => (
+                <PlayerCard key={p.player_id} player={p} />
+              ))}
+            </div>
+          )}
 
-      {data && data.players.length === 0 && (
-        <p className="mt-10 text-sm text-[var(--text-muted)]">No players match “{search}”.</p>
-      )}
+          {data && data.players.length === 0 && (
+            <p className="mt-4 text-sm text-[var(--text-muted)]">No players match “{search}”.</p>
+          )}
+        </div>
+
+        <aside className="shrink-0 lg:w-80">
+          <div className="lg:sticky lg:top-24">
+            <FeedPanel />
+          </div>
+        </aside>
+      </div>
 
       <footer className="mt-10 border-t border-[var(--border-hairline)] pt-4 text-xs text-[var(--text-muted)]">
         Stats via Basketball-Reference · Prices from the NBAStock model v0 · Virtual market — not real

@@ -58,6 +58,23 @@ export interface Portfolio {
   holdings: Holding[];
 }
 
+export interface MarketEvent {
+  id: number;
+  ts: string;
+  player_id: number;
+  name: string;
+  type: "price_move" | "news";
+  message: string;
+  delta_pct: number | null;
+  url: string | null;
+}
+
+export async function fetchFeed(): Promise<{ events: MarketEvent[] }> {
+  const res = await fetch(`${API_BASE}/api/feed`);
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
 export interface LeaderboardRow {
   rank: number;
   username: string;

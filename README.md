@@ -25,12 +25,19 @@ attention data, current prices, sparse price snapshots, and market events all
 live in one DB next to the trading ledger. An async scheduler inside the API
 process (`app/scheduler.py`) keeps it fresh — no batch-and-restart:
 
-- **trickle** — every 90s, refresh the stalest player's last-45-days
-  attention (whole league cycles ~1–2×/day, never bursts Wikimedia)
+- **trickle** — refresh the stalest player's last-45-days attention, one
+  small Wikimedia call at a time (whole league cycles ~1–2×/day)
 - **stats** — Basketball-Reference refresh once a day (stale ids pruned)
-- **reprice** — every 5 min, recompute the whole league from whatever data
-  landed since the last time step (z-scores are relative, so everyone
-  reprices together — ~10ms for 400 players); prices hold in between
+- **news** — ESPN NBA headlines every 15 min into the events feed, tied to
+  players via ESPN's roster ids when the article tags an athlete
+- **reprice** — event-driven, not wall-clock: collectors bump a
+  `data_version`; the loop reprices only when inputs actually changed
+  (a quiet offseason night = zero reprices). Repricing is always global —
+  z-scores are relative — and costs ~10ms for 400 players.
+
+Collection tempo scales with how alive the league is via `NBASTOCK_TEMPO`
+(`live` for game windows, `normal`, `idle`); in-season, a schedule check
+should flip `live` on automatically during games.
 
 Prices are driven by the **trailing-30-day** attention window (season totals
 remain for fame display), so the market genuinely moves with the news cycle.
@@ -84,8 +91,10 @@ Open http://localhost:3000.
       move daily even in the offseason (draft/free-agency news moves
       attention). `GET /api/players/{id}/history` serves 120 days.
 - [ ] Player ETFs (team funds, rookie index)
-- [x] Continuous DB-backed market: async per-player collectors + periodic
-      global reprice + events/SSE feed endpoints (frontend feed UI pending)
+- [x] Continuous DB-backed market: async per-player collectors +
+      event-driven global reprice + events/SSE feed endpoints
+- [x] Live feed UI on the market page: price moves + real ESPN headlines
+      (player-linked when the article tags an athlete)
 - [ ] Sentiment signals: Reddit r/nba mentions (free API), X/Twitter (paid)
 - [ ] Advanced stats: real PER/BPM/VORP/WS from Basketball-Reference's
       advanced page → 2K-style overall ratings on cards

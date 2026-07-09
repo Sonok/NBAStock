@@ -109,9 +109,22 @@ def init() -> None:
             );
             """
         )
+        try:
+            conn.execute("ALTER TABLE events ADD COLUMN url TEXT")
+        except sqlite3.OperationalError:
+            pass  # column already exists
 
 
 # ---------------------------------------------------------------- writes
+
+def _bump_data_version(conn: sqlite3.Connection) -> None:
+    """Collectors call this (inside their transaction) whenever market inputs
+    change; the reprice loop only runs when the version moved."""
+    conn.execute(
+        "INSERT INTO meta (key, value) VALUES ('data_version', '1') "
+        "ON CONFLICT(key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)"
+    )
+
 
 def upsert_player_stats(season: str, rows: list[dict]) -> None:
     """Raw ingest rows (UPPERCASE keys) -> players table."""
@@ -138,6 +151,7 @@ def upsert_player_stats(season: str, rows: list[dict]) -> None:
                 for r in rows
             ],
         )
+        _bump_data_version(conn)
 
 
 def upsert_daily_views(season: str, player_id: int, series: dict[str, int]) -> None:
@@ -151,6 +165,8 @@ def upsert_daily_views(season: str, player_id: int, series: dict[str, int]) -> N
             "UPDATE players SET views_updated_at = ? WHERE season = ? AND player_id = ?",
             (_now(), season, player_id),
         )
+        if series:
+            _bump_data_version(conn)
 
 
 def set_prices(season: str, priced: list[PricedPlayer]) -> None:
@@ -185,11 +201,20 @@ def add_snapshots(season: str, prices: dict[int, float]) -> None:
         )
 
 
-def add_event(season: str, player_id: int, name: str, type_: str, message: str, delta_pct: float | None = None) -> None:
+def add_event(
+    season: str,
+    player_id: int,
+    name: str,
+    type_: str,
+    message: str,
+    delta_pct: float | None = None,
+    url: str | None = None,
+) -> None:
     with _lock, _conn() as conn:
         conn.execute(
-            "INSERT INTO events (season, ts, player_id, name, type, message, delta_pct) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (season, _now(), player_id, name, type_, message, delta_pct),
+            "INSERT INTO events (season, ts, player_id, name, type, message, delta_pct, url) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (season, _now(), player_id, name, type_, message, delta_pct, url),
         )
 
 
