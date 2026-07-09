@@ -71,6 +71,10 @@ Open http://localhost:3000.
       move daily even in the offseason (draft/free-agency news moves
       attention). `GET /api/players/{id}/history` serves 120 days.
 - [ ] Player ETFs (team funds, rookie index)
+- [ ] Live feed + per-player async updates (see architecture note below)
+- [ ] Sentiment signals: Reddit r/nba mentions (free API), X/Twitter (paid)
+- [ ] Advanced stats: real PER/BPM/VORP/WS from Basketball-Reference's
+      advanced page → 2K-style overall ratings on cards
 - [x] Real popularity signal (Wikipedia pageviews; X/Twitter API is paid —
       revisit if funded)
 - [ ] Highlights on player pages

@@ -8,6 +8,7 @@ Run:  uvicorn app.main:app --reload --port 8000
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict
 
 import requests
@@ -31,8 +32,12 @@ app.add_middleware(
 
 # Headshots are proxied through this API: the NBA CDN resets HTTP/2
 # connections from browsers on some ISPs, but server-side requests get
-# through. Fetched once, cached on disk forever.
+# through. Fetched once, cached on disk forever. Players the NBA CDN doesn't
+# know (fresh rookies, two-way contracts) fall back to ESPN's headshots,
+# resolved by name via ESPN's public athlete index.
 NBA_CDN_HEADSHOT = "https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png"
+ESPN_INDEX = "https://sports.core.api.espn.com/v3/sports/basketball/nba/athletes?limit=1000&active=true"
+ESPN_HEADSHOT = "https://a.espncdn.com/i/headshots/nba/players/full/{espn_id}.png"
 HEADSHOT_DIR = ingest.DATA_DIR / "headshots"
 HEADSHOT_HEADERS = {
     "User-Agent": (
@@ -175,19 +180,57 @@ def player_history(player_id: int, season: str = ingest.DEFAULT_SEASON) -> dict:
     return {"player_id": player_id, "dates": hist["dates"], "prices": series}
 
 
+def _espn_ids() -> dict[str, str]:
+    """Normalized player name -> ESPN athlete id, cached on disk."""
+    path = ingest.DATA_DIR / "espn_ids.json"
+    if path.exists():
+        return json.loads(path.read_text())
+    try:
+        r = requests.get(ESPN_INDEX, headers=HEADSHOT_HEADERS, timeout=20)
+        r.raise_for_status()
+        ids = {
+            ingest._normalize_name(item["displayName"]): str(item["id"])
+            for item in r.json().get("items", [])
+            if item.get("displayName") and item.get("id")
+        }
+    except requests.RequestException:
+        return {}
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps(ids))
+    return ids
+
+
+def _fetch_headshot(player_id: int) -> bytes | None:
+    r = requests.get(
+        NBA_CDN_HEADSHOT.format(player_id=player_id),
+        headers=HEADSHOT_HEADERS,
+        timeout=15,
+    )
+    if r.status_code == 200 and r.content:
+        return r.content
+    player = _player_map(ingest.DEFAULT_SEASON).get(player_id)
+    if not player:
+        return None
+    espn_id = _espn_ids().get(ingest._normalize_name(player["name"]))
+    if not espn_id:
+        return None
+    r = requests.get(
+        ESPN_HEADSHOT.format(espn_id=espn_id), headers=HEADSHOT_HEADERS, timeout=15
+    )
+    if r.status_code == 200 and r.content:
+        return r.content
+    return None
+
+
 @app.get("/api/headshots/{player_id}.png")
 def headshot(player_id: int) -> Response:
     path = HEADSHOT_DIR / f"{player_id}.png"
     if not path.exists():
-        r = requests.get(
-            NBA_CDN_HEADSHOT.format(player_id=player_id),
-            headers=HEADSHOT_HEADERS,
-            timeout=15,
-        )
-        if r.status_code != 200 or not r.content:
+        content = _fetch_headshot(player_id)
+        if content is None:
             raise HTTPException(status_code=404, detail="No headshot")
         HEADSHOT_DIR.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(r.content)
+        path.write_bytes(content)
     return Response(
         path.read_bytes(),
         media_type="image/png",

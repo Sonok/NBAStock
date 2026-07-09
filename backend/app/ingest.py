@@ -73,6 +73,7 @@ def _season_end_year(season: str) -> int:
 
 def _normalize_name(name: str) -> str:
     """Accent-insensitive, suffix-insensitive key for name matching."""
+    name = name.replace("ё", "e").replace("Ё", "E")  # Cyrillic ё survives NFKD
     ascii_name = (
         unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     )
