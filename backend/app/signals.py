@@ -118,8 +118,8 @@ class AttentionSpikeDetector:
                     Signal(
                         kind="attention_spike",
                         message=(
-                            f"Attention spike: {players[pid]} — {views:,} pageviews "
-                            f"({views / baseline:.0f}x their normal day)"
+                            f"In the news: {players[pid]} — {views:,} pageviews "
+                            f"({views / baseline:.0f}x a normal day)"
                         ),
                         player_ids=[pid],
                         primary_name=players[pid],

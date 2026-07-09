@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { API_BASE, type Player } from "@/lib/api";
 import { teamColors } from "@/lib/teamColors";
@@ -54,7 +55,7 @@ function Sparkline({ series }: { series: number[] }) {
   );
 }
 
-function BreakdownBar({ label, z }: { label: string; z: number }) {
+export function BreakdownBar({ label, z }: { label: string; z: number }) {
   const clamped = Math.max(-Z_RANGE, Math.min(Z_RANGE, z));
   const pct = (Math.abs(clamped) / Z_RANGE) * 50;
   const positive = clamped >= 0;
@@ -114,6 +115,13 @@ export default function PlayerCard({ player }: { player: Player }) {
         />
         {/* darken the bottom of the banner so white type always clears it */}
         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/55 to-transparent" />
+
+        {/* whole banner links to the player's page */}
+        <Link
+          href={`/players/${player.player_id}`}
+          aria-label={`${player.name} player page`}
+          className="absolute inset-0 z-10"
+        />
 
         {/* cutout headshot, Skybox-style: no frame, rises from the banner floor */}
         <div className="absolute bottom-0 right-1 h-[104px] w-[142px]">

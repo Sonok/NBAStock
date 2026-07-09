@@ -69,6 +69,43 @@ HEADSHOT_HEADERS = {
 
 _memo: dict[str, tuple[float, object]] = {}
 
+# Basketball-Reference award codes -> letterman patches. "-1" means won it;
+# any other rank means they were on the ballot.
+AWARD_WINS = {
+    "MVP": "MVP", "ROY": "Rookie of the Year", "DPOY": "Defensive POY",
+    "SMOY": "Sixth Man", "6MOY": "Sixth Man", "MIP": "Most Improved",
+    "CPOY": "Clutch Player",
+}
+AWARD_TEAMS = {
+    "AS": "All-Star", "NBA1": "All-NBA 1st", "NBA2": "All-NBA 2nd",
+    "NBA3": "All-NBA 3rd", "DEF1": "All-Defense 1st", "DEF2": "All-Defense 2nd",
+    "ROOK1": "All-Rookie 1st", "ROOK2": "All-Rookie 2nd",
+}
+# prestige drives patch styling on the frontend
+GOLD = {"MVP", "ROY", "DPOY", "SMOY", "6MOY", "MIP", "CPOY"}
+
+
+def parse_badges(awards: str | None) -> list[dict]:
+    badges = []
+    for token in (awards or "").split(","):
+        token = token.strip()
+        if not token:
+            continue
+        code, _, rank = token.partition("-")
+        if code in AWARD_TEAMS:
+            tier = "gold" if code == "AS" else "silver"
+            badges.append({"code": code, "label": AWARD_TEAMS[code], "tier": tier})
+        elif code in AWARD_WINS:
+            if rank == "1":
+                badges.append({"code": code, "label": AWARD_WINS[code], "tier": "gold"})
+            elif rank and int(rank) <= 10:
+                badges.append(
+                    {"code": code, "label": f"{AWARD_WINS[code]} ballot", "tier": "felt"}
+                )
+    order = {"gold": 0, "silver": 1, "felt": 2}
+    badges.sort(key=lambda b: order[b["tier"]])
+    return badges
+
 
 def _ttl(key: str, ttl: float, build):
     hit = _memo.get(key)
@@ -108,6 +145,7 @@ def _market_rows(season: str) -> list[dict]:
                     "game_score": r["game_score"],
                     "tier": r["tier"],
                     "wiki_views": r["wiki_views"],
+                    "badges": parse_badges(r["awards"]),
                     "rank": i + 1,
                     "headshot": f"/api/headshots/{r['player_id']}.png",
                     "spark": series,
@@ -227,8 +265,11 @@ def get_leaderboard(season: str = ingest.DEFAULT_SEASON) -> dict:
 
 
 @app.get("/api/feed")
-def feed(since_id: int = 0, limit: int = 50) -> dict:
-    return {"events": store.events_since(since_id, limit)}
+def feed(since_id: int = 0, limit: int = 50, player_id: int = 0) -> dict:
+    events = store.events_since(since_id, limit if not player_id else 200)
+    if player_id:
+        events = [e for e in events if e["player_id"] == player_id][:limit]
+    return {"events": events}
 
 
 @app.get("/api/feed/stream")

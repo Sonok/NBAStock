@@ -109,10 +109,14 @@ def init() -> None:
             );
             """
         )
-        try:
-            conn.execute("ALTER TABLE events ADD COLUMN url TEXT")
-        except sqlite3.OperationalError:
-            pass  # column already exists
+        for migration in (
+            "ALTER TABLE events ADD COLUMN url TEXT",
+            "ALTER TABLE players ADD COLUMN awards TEXT",
+        ):
+            try:
+                conn.execute(migration)
+            except sqlite3.OperationalError:
+                pass  # column already exists
 
 
 # ---------------------------------------------------------------- writes
@@ -129,12 +133,12 @@ def _bump_data_version(conn: sqlite3.Connection) -> None:
 def upsert_player_stats(season: str, rows: list[dict]) -> None:
     """Raw ingest rows (UPPERCASE keys) -> players table."""
     now = _now()
-    cols = ["season", "player_id", "name", "team_abbr", *STAT_COLS, "stats_updated_at"]
+    cols = ["season", "player_id", "name", "team_abbr", *STAT_COLS, "awards", "stats_updated_at"]
     sql = (
         f"INSERT INTO players ({', '.join(cols)}) "
         f"VALUES ({', '.join('?' * len(cols))}) "
         "ON CONFLICT(season, player_id) DO UPDATE SET "
-        + ", ".join(f"{c} = excluded.{c}" for c in ["name", "team_abbr", *STAT_COLS, "stats_updated_at"])
+        + ", ".join(f"{c} = excluded.{c}" for c in ["name", "team_abbr", *STAT_COLS, "awards", "stats_updated_at"])
     )
     with _lock, _conn() as conn:
         conn.executemany(
@@ -146,6 +150,7 @@ def upsert_player_stats(season: str, rows: list[dict]) -> None:
                     r["PLAYER_NAME"],
                     r["TEAM_ABBREVIATION"],
                     *[float(r.get(k, 0) or 0) for k in ROW_TO_COL],
+                    r.get("AWARDS", ""),
                     now,
                 )
                 for r in rows

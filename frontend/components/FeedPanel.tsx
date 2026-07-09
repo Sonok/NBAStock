@@ -18,7 +18,7 @@ function EventRow({ e }: { e: MarketEvent }) {
     e.type === "signal" ? (
       <div className="min-w-0">
         <span className="mr-1.5 rounded border border-[var(--series-pos)] px-1 py-px text-[9px] font-bold uppercase tracking-widest text-[var(--series-pos)] align-middle">
-          Signal
+          Notable
         </span>
         <span className="text-sm leading-snug text-[var(--text-secondary)]">{e.message}</span>
       </div>
@@ -67,15 +67,21 @@ function EventRow({ e }: { e: MarketEvent }) {
   );
 }
 
-export default function FeedPanel() {
+export default function FeedPanel({
+  playerId,
+  title = "Notable events",
+}: {
+  playerId?: number;
+  title?: string;
+}) {
   const [events, setEvents] = useState<MarketEvent[]>([]);
 
   useEffect(() => {
-    const load = () => fetchFeed().then((d) => setEvents(d.events)).catch(() => {});
+    const load = () => fetchFeed(playerId).then((d) => setEvents(d.events)).catch(() => {});
     load();
     const t = setInterval(load, POLL_MS);
     return () => clearInterval(t);
-  }, []);
+  }, [playerId]);
 
   return (
     <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
@@ -84,11 +90,12 @@ export default function FeedPanel() {
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--delta-good)] opacity-60" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--delta-good)]" />
         </span>
-        <h2 className="text-sm font-semibold uppercase tracking-wide">Live feed</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide">{title}</h2>
       </div>
       {events.length === 0 ? (
         <p className="mt-3 text-sm text-[var(--text-muted)]">
-          Quiet market — price moves and headlines land here as they happen.
+          Quiet {playerId ? "for this player" : "market"} — price moves and headlines land here as
+          they happen.
         </p>
       ) : (
         <ul className="mt-2">

@@ -1,5 +1,11 @@
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+export interface Badge {
+  code: string;
+  label: string;
+  tier: "gold" | "silver" | "felt";
+}
+
 export interface Player {
   player_id: number;
   name: string;
@@ -18,6 +24,7 @@ export interface Player {
   spark: number[];
   change_30d_pct: number;
   wiki_views: number | null;
+  badges: Badge[];
   stats: {
     gp: number;
     min: number;
@@ -69,8 +76,23 @@ export interface MarketEvent {
   url: string | null;
 }
 
-export async function fetchFeed(): Promise<{ events: MarketEvent[] }> {
-  const res = await fetch(`${API_BASE}/api/feed`);
+export async function fetchFeed(playerId?: number): Promise<{ events: MarketEvent[] }> {
+  const qs = playerId ? `?player_id=${playerId}` : "";
+  const res = await fetch(`${API_BASE}/api/feed${qs}`);
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+export async function fetchPlayer(playerId: number): Promise<Player> {
+  const res = await fetch(`${API_BASE}/api/players/${playerId}`);
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+export async function fetchHistory(
+  playerId: number
+): Promise<{ dates: string[]; prices: number[] }> {
+  const res = await fetch(`${API_BASE}/api/players/${playerId}/history`);
   if (!res.ok) throw new Error(`API error ${res.status}`);
   return res.json();
 }
