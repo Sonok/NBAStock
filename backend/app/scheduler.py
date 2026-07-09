@@ -1,12 +1,15 @@
 """Async background collectors + the adaptive reprice loop.
 
-Runs inside the FastAPI process (started from the app's lifespan). Four
+Runs inside the FastAPI process (started from the app's lifespan). Five
 independent loops, all writing to the store:
 
   trickle   refresh the stalest player's attention data, one small
             Wikimedia call at a time
   stats     Basketball-Reference season stats, once per STATS_HOURS
   news      ESPN NBA headlines into the events feed
+  signals   pluggable event detectors (signals.py) — trade/injury buzz,
+            attention spikes, live games; they front-run the trickle queue
+            and flip tempo to `live` for a window
   reprice   EVENT-DRIVEN, not wall-clock: collectors bump a data_version
             in the store; this loop polls the version and only reprices
             when inputs actually changed. A quiet offseason night produces
@@ -31,7 +34,7 @@ from datetime import datetime, timezone
 
 import requests
 
-from . import ingest, market, news, popularity, store
+from . import ingest, market, news, popularity, signals, store
 
 log = logging.getLogger("nbastock.scheduler")
 
@@ -40,10 +43,22 @@ TEMPOS = {
     "normal": {"trickle": 90, "reprice_poll": 60},
     "idle": {"trickle": 600, "reprice_poll": 300},
 }
-TEMPO = TEMPOS.get(os.environ.get("NBASTOCK_TEMPO", "normal"), TEMPOS["normal"])
 STATS_HOURS = 24
 NEWS_SECONDS = 900
+SIGNALS_SECONDS = 120
 SEASON = ingest.DEFAULT_SEASON
+
+
+def current_tempo() -> dict:
+    """Baseline from NBASTOCK_TEMPO; signals can override to `live` for a
+    window (games in progress, breaking trade/injury news)."""
+    override = store.get_meta("tempo_override")
+    if override:
+        mode, _, expiry = override.partition("|")
+        if mode in TEMPOS and expiry:
+            if datetime.fromisoformat(expiry) > datetime.now(timezone.utc):
+                return TEMPOS[mode]
+    return TEMPOS.get(os.environ.get("NBASTOCK_TEMPO", "normal"), TEMPOS["normal"])
 
 
 def _hours_since(iso: str | None) -> float:
@@ -67,7 +82,7 @@ async def _trickle_loop() -> None:
                 log.info("trickle: %s (%d days)", p["name"], days)
         except Exception:
             log.exception("trickle failed")
-        await asyncio.sleep(TEMPO["trickle"])
+        await asyncio.sleep(current_tempo()["trickle"])
 
 
 async def _stats_loop() -> None:
@@ -103,10 +118,21 @@ async def _news_loop() -> None:
         await asyncio.sleep(NEWS_SECONDS)
 
 
+async def _signals_loop() -> None:
+    while True:
+        try:
+            summary = await asyncio.to_thread(signals.run, SEASON)
+            if summary.get("signals"):
+                log.info("signals: %s", summary)
+        except Exception:
+            log.exception("signals failed")
+        await asyncio.sleep(SIGNALS_SECONDS)
+
+
 async def _reprice_loop() -> None:
     last_version = store.get_meta("data_version")
     while True:
-        await asyncio.sleep(TEMPO["reprice_poll"])
+        await asyncio.sleep(current_tempo()["reprice_poll"])
         try:
             version = store.get_meta("data_version")
             if version == last_version:
@@ -120,5 +146,5 @@ async def _reprice_loop() -> None:
 
 async def run() -> None:
     await asyncio.gather(
-        _trickle_loop(), _stats_loop(), _news_loop(), _reprice_loop()
+        _trickle_loop(), _stats_loop(), _news_loop(), _signals_loop(), _reprice_loop()
     )

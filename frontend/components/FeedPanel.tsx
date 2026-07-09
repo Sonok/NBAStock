@@ -15,7 +15,14 @@ function timeAgo(iso: string): string {
 
 function EventRow({ e }: { e: MarketEvent }) {
   const body =
-    e.type === "news" ? (
+    e.type === "signal" ? (
+      <div className="min-w-0">
+        <span className="mr-1.5 rounded border border-[var(--series-pos)] px-1 py-px text-[9px] font-bold uppercase tracking-widest text-[var(--series-pos)] align-middle">
+          Signal
+        </span>
+        <span className="text-sm leading-snug text-[var(--text-secondary)]">{e.message}</span>
+      </div>
+    ) : e.type === "news" ? (
       <div className="min-w-0">
         <span className="mr-1.5 rounded bg-[var(--gridline)] px-1 py-px text-[9px] font-bold uppercase tracking-widest text-[var(--text-muted)] align-middle">
           News

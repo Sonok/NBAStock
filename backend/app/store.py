@@ -218,6 +218,16 @@ def add_event(
         )
 
 
+def mark_priority(season: str, player_ids: list[int]) -> None:
+    """Jump these players to the front of the attention-trickle queue
+    (NULL timestamps sort first in stalest_players)."""
+    with _lock, _conn() as conn:
+        conn.executemany(
+            "UPDATE players SET views_updated_at = NULL WHERE season = ? AND player_id = ?",
+            [(season, pid) for pid in player_ids],
+        )
+
+
 def prune_stale(season: str, before_iso: str) -> int:
     """Drop players a full stats refresh didn't touch (id churn orphans),
     plus their attention data."""

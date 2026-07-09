@@ -30,6 +30,12 @@ process (`app/scheduler.py`) keeps it fresh — no batch-and-restart:
 - **stats** — Basketball-Reference refresh once a day (stale ids pruned)
 - **news** — ESPN NBA headlines every 15 min into the events feed, tied to
   players via ESPN's roster ids when the article tags an athlete
+- **signals** — pluggable event detectors (`app/signals.py`): trade/injury/
+  signing language in headlines, per-player attention spikes vs their own
+  baseline, and live games via ESPN's scoreboard. A firing signal jumps the
+  named players to the front of the trickle queue, flips tempo to `live`
+  for a window, and lands in the feed. New detectors (odds moves, Reddit
+  velocity, direct social feeds) just implement `detect()` and register.
 - **reprice** — event-driven, not wall-clock: collectors bump a
   `data_version`; the loop reprices only when inputs actually changed
   (a quiet offseason night = zero reprices). Repricing is always global —
@@ -95,6 +101,8 @@ Open http://localhost:3000.
       event-driven global reprice + events/SSE feed endpoints
 - [x] Live feed UI on the market page: price moves + real ESPN headlines
       (player-linked when the article tags an athlete)
+- [x] Event detection skeleton: plug-and-play detectors that sense trades/
+      injuries/games/attention spikes and make the market react
 - [ ] Sentiment signals: Reddit r/nba mentions (free API), X/Twitter (paid)
 - [ ] Advanced stats: real PER/BPM/VORP/WS from Basketball-Reference's
       advanced page → 2K-style overall ratings on cards
