@@ -167,12 +167,21 @@ def _fetch_standings(year: int) -> dict[str, float]:
     return win_pct
 
 
-def _fetch_per_game(year: int) -> pd.DataFrame:
+def _fetch_per_game(year: int) -> tuple[pd.DataFrame, dict[str, str]]:
+    """The per-game table plus normalized name -> bbref player id (parsed
+    from the anchor tags pandas drops; ids unlock bbref player pages for
+    shooting zones and future advanced stats)."""
     html = _get(f"https://www.basketball-reference.com/leagues/NBA_{year}_per_game.html")
+    bbref_ids = {
+        _normalize_name(name): pid
+        for pid, name in re.findall(
+            r'href="/players/[a-z]/([a-z0-9]+)\.html">([^<]+)</a>', html
+        )
+    }
     for df in _read_tables(html):
         cols = set(map(str, df.columns))
         if {"Player", "PTS", "TRB", "AST"}.issubset(cols):
-            return df
+            return df, bbref_ids
     raise RuntimeError(f"per-game table not found for {year}")
 
 
@@ -187,7 +196,7 @@ def _num(row, col, default=0.0) -> float:
 def refresh(season: str = DEFAULT_SEASON) -> dict:
     """Pull fresh data from Basketball-Reference and write the cache file."""
     year = _season_end_year(season)
-    df = _fetch_per_game(year)
+    df, bbref_ids = _fetch_per_game(year)
     time.sleep(2)  # be polite between requests
     standings = _fetch_standings(year)
     nba_ids = _nba_id_index()
@@ -233,6 +242,7 @@ def refresh(season: str = DEFAULT_SEASON) -> dict:
                 "FG3M": _num(stat_row, "3P"),
                 "W_PCT": standings.get(abbr, 0.5),
                 "AWARDS": "" if pd.isna(stat_row.get("Awards")) else str(stat_row.get("Awards", "")),
+                "BBREF_ID": bbref_ids.get(norm, ""),
                 "DD2": 0,   # not in the per-game table; star_power tolerates 0
                 "TD3": 0,
                 "PLUS_MINUS": 0.0,

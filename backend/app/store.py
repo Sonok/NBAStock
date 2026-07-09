@@ -109,9 +109,19 @@ def init() -> None:
             );
             """
         )
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS profiles (
+                season TEXT NOT NULL,
+                player_id INTEGER NOT NULL,
+                json TEXT NOT NULL,
+                fetched_at TEXT NOT NULL,
+                PRIMARY KEY (season, player_id)
+            )"""
+        )
         for migration in (
             "ALTER TABLE events ADD COLUMN url TEXT",
             "ALTER TABLE players ADD COLUMN awards TEXT",
+            "ALTER TABLE players ADD COLUMN bbref_id TEXT",
         ):
             try:
                 conn.execute(migration)
@@ -133,12 +143,12 @@ def _bump_data_version(conn: sqlite3.Connection) -> None:
 def upsert_player_stats(season: str, rows: list[dict]) -> None:
     """Raw ingest rows (UPPERCASE keys) -> players table."""
     now = _now()
-    cols = ["season", "player_id", "name", "team_abbr", *STAT_COLS, "awards", "stats_updated_at"]
+    cols = ["season", "player_id", "name", "team_abbr", *STAT_COLS, "awards", "bbref_id", "stats_updated_at"]
     sql = (
         f"INSERT INTO players ({', '.join(cols)}) "
         f"VALUES ({', '.join('?' * len(cols))}) "
         "ON CONFLICT(season, player_id) DO UPDATE SET "
-        + ", ".join(f"{c} = excluded.{c}" for c in ["name", "team_abbr", *STAT_COLS, "awards", "stats_updated_at"])
+        + ", ".join(f"{c} = excluded.{c}" for c in ["name", "team_abbr", *STAT_COLS, "awards", "bbref_id", "stats_updated_at"])
     )
     with _lock, _conn() as conn:
         conn.executemany(
@@ -151,6 +161,7 @@ def upsert_player_stats(season: str, rows: list[dict]) -> None:
                     r["TEAM_ABBREVIATION"],
                     *[float(r.get(k, 0) or 0) for k in ROW_TO_COL],
                     r.get("AWARDS", ""),
+                    r.get("BBREF_ID", ""),
                     now,
                 )
                 for r in rows
@@ -381,6 +392,28 @@ def stalest_players(season: str, k: int) -> list[dict]:
                 (season, k),
             )
         ]
+
+
+def get_profile(season: str, player_id: int) -> dict | None:
+    import json as _json
+
+    with _lock, _conn() as conn:
+        row = conn.execute(
+            "SELECT json FROM profiles WHERE season = ? AND player_id = ?",
+            (season, player_id),
+        ).fetchone()
+        return _json.loads(row["json"]) if row else None
+
+
+def set_profile(season: str, player_id: int, profile: dict) -> None:
+    import json as _json
+
+    with _lock, _conn() as conn:
+        conn.execute(
+            "INSERT INTO profiles (season, player_id, json, fetched_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(season, player_id) DO UPDATE SET json = excluded.json, fetched_at = excluded.fetched_at",
+            (season, player_id, _json.dumps(profile), _now()),
+        )
 
 
 def events_since(last_id: int, limit: int = 50) -> list[dict]:

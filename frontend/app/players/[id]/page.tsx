@@ -7,8 +7,17 @@ import FeedPanel from "@/components/FeedPanel";
 import Patches from "@/components/Patches";
 import { BreakdownBar } from "@/components/PlayerCard";
 import PriceChart from "@/components/PriceChart";
+import Radar from "@/components/Radar";
+import ShotZones from "@/components/ShotZones";
 import TradeModal from "@/components/TradeModal";
-import { API_BASE, fetchHistory, fetchPlayer, type Player } from "@/lib/api";
+import {
+  API_BASE,
+  fetchHistory,
+  fetchPlayer,
+  fetchProfile,
+  type Player,
+  type Profile,
+} from "@/lib/api";
 import { teamColors } from "@/lib/teamColors";
 
 export default function PlayerPage() {
@@ -16,6 +25,7 @@ export default function PlayerPage() {
   const playerId = Number(id);
   const [player, setPlayer] = useState<Player | null>(null);
   const [history, setHistory] = useState<{ dates: string[]; prices: number[] } | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [trade, setTrade] = useState<"buy" | "sell" | null>(null);
   const [error, setError] = useState(false);
 
@@ -23,6 +33,7 @@ export default function PlayerPage() {
     if (!playerId) return;
     fetchPlayer(playerId).then(setPlayer).catch(() => setError(true));
     fetchHistory(playerId).then(setHistory).catch(() => {});
+    fetchProfile(playerId).then(setProfile).catch(() => {});
   }, [playerId]);
 
   if (error) {
@@ -91,6 +102,11 @@ export default function PlayerPage() {
           <div className="absolute bottom-5 left-6 right-[320px]">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/75">
               {player.name.split(" ")[0]}
+              {profile?.nickname?.[0] && (
+                <span className="ml-3 normal-case tracking-normal text-white/60">
+                  “{profile.nickname[0]}”
+                </span>
+              )}
             </p>
             <h1 className="mt-0.5 truncate text-5xl font-black uppercase leading-none tracking-tight text-white [text-shadow:0_2px_6px_rgba(0,0,0,0.55)]">
               {player.name.split(" ").slice(1).join(" ") || player.name}
@@ -186,9 +202,95 @@ export default function PlayerPage() {
               </p>
             )}
           </section>
+
+          {profile?.ratings?.attributes && (
+            <section className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                  Scouting report
+                </h2>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-3xl font-black tabular-nums">{profile.ratings.overall}</span>
+                  <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                    OVR
+                  </span>
+                </div>
+              </div>
+              <div className="mt-2 flex flex-col items-center gap-4 sm:flex-row">
+                <Radar attributes={profile.ratings.attributes} />
+                <div className="w-full space-y-3 text-sm">
+                  {!!profile.ratings.strengths?.length && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                        Strengths
+                      </p>
+                      <p className="mt-1 font-medium" style={{ color: "var(--delta-good)" }}>
+                        {profile.ratings.strengths.join(" · ")}
+                      </p>
+                    </div>
+                  )}
+                  {!!profile.ratings.weaknesses?.length && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                        Weaknesses
+                      </p>
+                      <p className="mt-1 font-medium" style={{ color: "var(--delta-bad)" }}>
+                        {profile.ratings.weaknesses.join(" · ")}
+                      </p>
+                    </div>
+                  )}
+                  <p className="text-xs leading-relaxed text-[var(--text-muted)]">
+                    Attributes are league percentiles from this season&apos;s stats — the honest
+                    version of a 2K rating.
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {!!profile?.shot_zones?.length && (
+            <section className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-5">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                Shot profile
+              </h2>
+              <div className="mt-4">
+                <ShotZones zones={profile.shot_zones} />
+              </div>
+            </section>
+          )}
         </div>
 
-        <aside>
+        <aside className="space-y-6">
+          {profile?.bio && (
+            <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide">About</h2>
+              {profile.nickname.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {profile.nickname.map((n) => (
+                    <span
+                      key={n}
+                      className="rounded-full border border-[var(--border-hairline)] px-2 py-0.5 text-xs text-[var(--text-secondary)]"
+                    >
+                      “{n}”
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="mt-2.5 text-sm leading-relaxed text-[var(--text-secondary)]">
+                {profile.bio.length > 420 ? `${profile.bio.slice(0, 420)}…` : profile.bio}
+              </p>
+              {profile.wiki_url && (
+                <a
+                  href={profile.wiki_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-block text-xs text-[var(--series-pos)] hover:underline"
+                >
+                  Full bio on Wikipedia →
+                </a>
+              )}
+            </div>
+          )}
           <div className="lg:sticky lg:top-24">
             <FeedPanel playerId={player.player_id} title={`${player.name.split(" ").slice(-1)[0]} news`} />
           </div>

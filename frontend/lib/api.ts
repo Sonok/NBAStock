@@ -89,6 +89,37 @@ export async function fetchPlayer(playerId: number): Promise<Player> {
   return res.json();
 }
 
+export interface RatingAttr {
+  label: string;
+  value: number;
+}
+
+export interface ShotZone {
+  zone: string;
+  share: number;
+  fg_pct: number;
+}
+
+export interface Profile {
+  player_id: number;
+  bio: string;
+  nickname: string[];
+  wiki_url: string;
+  ratings: {
+    attributes?: RatingAttr[];
+    overall?: number;
+    strengths?: string[];
+    weaknesses?: string[];
+  };
+  shot_zones: ShotZone[];
+}
+
+export async function fetchProfile(playerId: number): Promise<Profile> {
+  const res = await fetch(`${API_BASE}/api/players/${playerId}/profile`);
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
 export async function fetchHistory(
   playerId: number
 ): Promise<{ dates: string[]; prices: number[] }> {

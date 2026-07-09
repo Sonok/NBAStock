@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
-from . import db, history, ingest, market, scheduler, store
+from . import db, history, ingest, market, profile, scheduler, store
 
 SPARK_DAYS = 30
 PLAYERS_TTL = 15  # seconds; the store only changes on reprice anyway
@@ -199,6 +199,14 @@ def player_history(player_id: int, season: str = ingest.DEFAULT_SEASON) -> dict:
     if series is None:
         raise HTTPException(status_code=404, detail="No history for player")
     return {"player_id": player_id, "dates": hist["dates"], "prices": series}
+
+
+@app.get("/api/players/{player_id}/profile")
+def player_profile(player_id: int, season: str = ingest.DEFAULT_SEASON) -> dict:
+    result = profile.get(season, player_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return result
 
 
 @app.get("/api/players/{player_id}")
