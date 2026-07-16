@@ -25,7 +25,7 @@ export default function TradeModal({
     setBusy(true);
     setError(null);
     try {
-      const r = await executeTrade({ username, player_id: player.player_id, shares, action });
+      const r = await executeTrade({ player_id: player.player_id, shares, action });
       setDone(
         `${action === "buy" ? "Bought" : "Sold"} ${shares} @ $${r.executed_price.toFixed(2)} — cash $${r.cash.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
       );
@@ -56,7 +56,7 @@ export default function TradeModal({
 
         {!username && (
           <p className="mt-4 text-sm text-[var(--delta-bad)]">
-            Pick a username in the top bar first — you get $10,000 to start.
+            Sign in from the top bar first — new accounts start with $10,000.
           </p>
         )}
 

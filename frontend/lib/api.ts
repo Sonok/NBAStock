@@ -135,10 +135,17 @@ export interface LeaderboardRow {
   total_return_pct: number;
 }
 
+import { getToken } from "@/lib/user";
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(body),
   });
   const data = await res.json();
@@ -146,12 +153,18 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return data;
 }
 
-export function login(username: string): Promise<{ username: string; cash: number }> {
-  return post("/api/users", { username });
+export function enterMarket(
+  username: string,
+  password: string
+): Promise<{ username: string; cash: number; token: string }> {
+  return post("/api/auth/enter", { username, password });
+}
+
+export function logout(): Promise<{ ok: boolean }> {
+  return post("/api/auth/logout", {});
 }
 
 export function executeTrade(params: {
-  username: string;
   player_id: number;
   shares: number;
   action: "buy" | "sell";
@@ -159,8 +172,8 @@ export function executeTrade(params: {
   return post("/api/trade", params);
 }
 
-export async function fetchPortfolio(username: string): Promise<Portfolio> {
-  const res = await fetch(`${API_BASE}/api/users/${encodeURIComponent(username)}/portfolio`);
+export async function fetchPortfolio(): Promise<Portfolio> {
+  const res = await fetch(`${API_BASE}/api/portfolio`, { headers: authHeaders() });
   if (!res.ok) throw new Error(`API error ${res.status}`);
   return res.json();
 }

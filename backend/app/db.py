@@ -1,4 +1,4 @@
-"""NBAStock trading ledger (SQLite).
+"""NBAStock trading ledger + accounts (SQLite).
 
 MVP market rules:
 - Every new user starts with $10,000 virtual cash.
@@ -7,17 +7,24 @@ MVP market rules:
   1x equity so accounts can't blow up to negative net worth on a whim.
 - avg_cost tracks the entry basis while a position grows; crossing zero
   (long -> short or back) resets the basis at the crossing trade's price.
+
+Auth: password accounts hashed with stdlib scrypt (salt$hash), bearer
+tokens in the sessions table (30-day expiry). Accounts created before
+passwords existed are "claimed" by the first password presented for them.
 """
 
 from __future__ import annotations
 
+import hashlib
+import secrets
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "data" / "nbastock.db"
 STARTING_CASH = 10_000.0
+SESSION_DAYS = 30
 
 _lock = threading.Lock()
 
@@ -55,23 +62,87 @@ def init() -> None:
                 price REAL NOT NULL,
                 ts TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS sessions (
+                token TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL
+            );
             """
         )
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+        except sqlite3.OperationalError:
+            pass  # column already exists
 
 
-def get_or_create_user(username: str) -> dict:
+def _hash_password(password: str, salt: bytes | None = None) -> str:
+    salt = salt or secrets.token_bytes(16)
+    digest = hashlib.scrypt(password.encode(), salt=salt, n=2**14, r=8, p=1)
+    return f"{salt.hex()}${digest.hex()}"
+
+
+def _verify_password(password: str, stored: str) -> bool:
+    salt_hex, _, digest_hex = stored.partition("$")
+    candidate = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt_hex), n=2**14, r=8, p=1)
+    return secrets.compare_digest(candidate.hex(), digest_hex)
+
+
+def _issue_token(conn: sqlite3.Connection, user_id: int) -> str:
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    conn.execute(
+        "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+        (token, user_id, now.isoformat(), (now + timedelta(days=SESSION_DAYS)).isoformat()),
+    )
+    return token
+
+
+def enter(username: str, password: str) -> dict:
+    """One-call auth: register if new, log in if known, claim if legacy
+    (pre-password account). Returns {username, cash, token}."""
     username = username.strip().lower()
     if not (3 <= len(username) <= 20) or not username.replace("_", "").isalnum():
         raise ValueError("Username must be 3-20 letters, numbers, or underscores")
+    if len(password) < 6:
+        raise ValueError("Password must be at least 6 characters")
+
     with _lock, _conn() as conn:
         row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
         if row is None:
             conn.execute(
-                "INSERT INTO users (username, cash, created_at) VALUES (?, ?, ?)",
-                (username, STARTING_CASH, datetime.now(timezone.utc).isoformat()),
+                "INSERT INTO users (username, cash, created_at, password_hash) VALUES (?, ?, ?, ?)",
+                (username, STARTING_CASH, datetime.now(timezone.utc).isoformat(),
+                 _hash_password(password)),
             )
             row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-        return dict(row)
+        elif row["password_hash"] is None:
+            # legacy passwordless account: first password claims it
+            conn.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (_hash_password(password), row["id"]),
+            )
+        elif not _verify_password(password, row["password_hash"]):
+            raise PermissionError("Wrong password for that username")
+        token = _issue_token(conn, row["id"])
+        return {"username": row["username"], "cash": row["cash"], "token": token}
+
+
+def user_for_token(token: str) -> dict | None:
+    if not token:
+        return None
+    with _lock, _conn() as conn:
+        row = conn.execute(
+            """SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id
+               WHERE s.token = ? AND s.expires_at > ?""",
+            (token, datetime.now(timezone.utc).isoformat()),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def revoke_token(token: str) -> None:
+    with _lock, _conn() as conn:
+        conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
 
 
 def _positions(conn: sqlite3.Connection, user_id: int) -> list[dict]:

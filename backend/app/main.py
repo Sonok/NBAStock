@@ -17,7 +17,7 @@ import time
 from contextlib import asynccontextmanager
 
 import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
@@ -217,32 +217,56 @@ def player_detail(player_id: int, season: str = ingest.DEFAULT_SEASON) -> dict:
     raise HTTPException(status_code=404, detail="Player not found or not qualified")
 
 
-class UserBody(BaseModel):
+class AuthBody(BaseModel):
     username: str
+    password: str
 
 
 class TradeBody(BaseModel):
-    username: str
     player_id: int
     shares: float
     action: str  # "buy" | "sell"
 
 
-@app.post("/api/users")
-def create_user(body: UserBody) -> dict:
+def _bearer(authorization: str | None = Header(default=None)) -> str:
+    if not authorization or not authorization.startswith("Bearer "):
+        return ""
+    return authorization.removeprefix("Bearer ")
+
+
+def require_user(token: str = Depends(_bearer)) -> dict:
+    user = db.user_for_token(token)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Sign in to do that")
+    return user
+
+
+@app.post("/api/auth/enter")
+def auth_enter(body: AuthBody) -> dict:
     try:
-        user = db.get_or_create_user(body.username)
+        return db.enter(body.username, body.password)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+
+@app.post("/api/auth/logout")
+def auth_logout(token: str = Depends(_bearer)) -> dict:
+    db.revoke_token(token)
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+def auth_me(user: dict = Depends(require_user)) -> dict:
     return {"username": user["username"], "cash": user["cash"]}
 
 
-@app.get("/api/users/{username}/portfolio")
-def get_portfolio(username: str, season: str = ingest.DEFAULT_SEASON) -> dict:
-    try:
-        result = db.portfolio(username, store.price_map(season))
-    except KeyError:
-        raise HTTPException(status_code=404, detail="User not found")
+@app.get("/api/portfolio")
+def get_portfolio(
+    user: dict = Depends(require_user), season: str = ingest.DEFAULT_SEASON
+) -> dict:
+    result = db.portfolio(user["username"], store.price_map(season))
     players_by_id = {r["player_id"]: r for r in _market_rows(season)}
     for h in result["holdings"]:
         p = players_by_id.get(h["player_id"])
@@ -255,14 +279,16 @@ def get_portfolio(username: str, season: str = ingest.DEFAULT_SEASON) -> dict:
 
 
 @app.post("/api/trade")
-def execute_trade(body: TradeBody, season: str = ingest.DEFAULT_SEASON) -> dict:
+def execute_trade(
+    body: TradeBody,
+    user: dict = Depends(require_user),
+    season: str = ingest.DEFAULT_SEASON,
+) -> dict:
     price = store.price_map(season).get(body.player_id)
     if price is None:
         raise HTTPException(status_code=404, detail="Player not found or not qualified")
     try:
-        return db.trade(body.username, body.player_id, body.shares, body.action, price)
-    except KeyError:
-        raise HTTPException(status_code=404, detail="User not found")
+        return db.trade(user["username"], body.player_id, body.shares, body.action, price)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

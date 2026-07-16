@@ -32,7 +32,7 @@ export default function PortfolioPage() {
   const refresh = useCallback(() => {
     const u = getUsername();
     setUser(u);
-    if (u) fetchPortfolio(u).then(setPortfolio).catch(() => setPortfolio(null));
+    if (u) fetchPortfolio().then(setPortfolio).catch(() => setPortfolio(null));
     else setPortfolio(null);
   }, []);
 
@@ -45,7 +45,7 @@ export default function PortfolioPage() {
   if (!user) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-16 text-center text-[var(--text-secondary)]">
-        Pick a username in the top bar to start trading — every new account gets $10,000.
+        Sign in from the top bar to start trading — every new account gets $10,000.
       </main>
     );
   }

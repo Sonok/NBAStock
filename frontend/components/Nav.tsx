@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { fetchPortfolio, login } from "@/lib/api";
-import { getUsername, REFRESH_EVENT, setUsername } from "@/lib/user";
+import { enterMarket, fetchPortfolio, logout } from "@/lib/api";
+import { getUsername, REFRESH_EVENT, setAuth } from "@/lib/user";
 
 const LINKS = [
   { href: "/", label: "Market" },
@@ -16,17 +16,21 @@ export default function Nav() {
   const pathname = usePathname();
   const [user, setUser] = useState<string | null>(null);
   const [cash, setCash] = useState<number | null>(null);
-  const [draft, setDraft] = useState("");
-  const [joining, setJoining] = useState(false);
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     const u = getUsername();
     setUser(u);
     if (u) {
-      fetchPortfolio(u)
+      fetchPortfolio()
         .then((p) => setCash(p.cash))
-        .catch(() => setCash(null));
+        .catch(() => {
+          setCash(null);
+          setAuth(null, null); // token expired or revoked
+        });
     } else {
       setCash(null);
     }
@@ -38,18 +42,29 @@ export default function Nav() {
     return () => window.removeEventListener(REFRESH_EVENT, refresh);
   }, [refresh]);
 
-  async function join() {
-    if (!draft.trim()) return;
-    setJoining(true);
+  async function enter() {
+    if (!name.trim() || !password) return;
+    setBusy(true);
     setError(null);
     try {
-      const u = await login(draft.trim());
-      setUsername(u.username);
+      const r = await enterMarket(name.trim(), password);
+      setAuth(r.token, r.username);
+      setName("");
+      setPassword("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't join");
+      setError(e instanceof Error ? e.message : "Couldn't sign in");
     } finally {
-      setJoining(false);
+      setBusy(false);
     }
+  }
+
+  async function signOut() {
+    try {
+      await logout();
+    } catch {
+      // token already dead — still clear locally
+    }
+    setAuth(null, null);
   }
 
   return (
@@ -83,7 +98,7 @@ export default function Nav() {
               )}
               <span className="text-sm text-[var(--text-secondary)]">@{user}</span>
               <button
-                onClick={() => setUsername(null)}
+                onClick={signOut}
                 className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
               >
                 Sign out
@@ -91,20 +106,30 @@ export default function Nav() {
             </>
           ) : (
             <div className="flex items-center gap-2">
-              {error && <span className="text-xs text-[var(--delta-bad)]">{error}</span>}
+              {error && <span className="max-w-52 truncate text-xs text-[var(--delta-bad)]" title={error}>{error}</span>}
               <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && join()}
-                placeholder="Pick a username"
-                className="w-40 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[rgba(255,255,255,0.3)]"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Username"
+                autoComplete="username"
+                className="w-32 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[rgba(255,255,255,0.3)]"
+              />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && enter()}
+                placeholder="Password"
+                autoComplete="current-password"
+                className="w-32 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[rgba(255,255,255,0.3)]"
               />
               <button
-                onClick={join}
-                disabled={joining}
-                className="rounded-lg bg-[var(--series-pos)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                onClick={enter}
+                disabled={busy}
+                className="whitespace-nowrap rounded-lg bg-[var(--series-pos)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                title="New username? You're registered with $10k. Existing? You're signed in."
               >
-                {joining ? "…" : "Join · get $10k"}
+                {busy ? "…" : "Enter · $10k"}
               </button>
             </div>
           )}
