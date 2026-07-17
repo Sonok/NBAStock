@@ -124,9 +124,9 @@ export default function PlayerPage() {
           <div className="absolute bottom-5 left-6 right-[320px]">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/75">
               {player.name.split(" ")[0]}
-              {profile?.nickname?.[0] && (
+              {!!profile?.nickname?.length && (
                 <span className="ml-3 normal-case tracking-normal text-white/60">
-                  “{profile.nickname[0]}”
+                  {profile.nickname.slice(0, 2).map((n) => `“${n}”`).join(" · ")}
                 </span>
               )}
             </p>
@@ -323,6 +323,25 @@ export default function PlayerPage() {
               </p>
               {profile.career && (
                 <div className="mt-3 space-y-1.5 border-t border-[var(--border-hairline)] pt-3 text-xs text-[var(--text-secondary)]">
+                  {profile.career.born && (
+                    <p>
+                      <span className="text-[var(--text-muted)]">Born</span> · {profile.career.born}
+                      {profile.career.age != null && ` (age ${profile.career.age})`}
+                    </p>
+                  )}
+                  {profile.career.birth_place && (
+                    <p><span className="text-[var(--text-muted)]">From</span> · {profile.career.birth_place.replace(/, U\.S\.$/, "")}</p>
+                  )}
+                  {profile.career.position && (
+                    <p>
+                      <span className="text-[var(--text-muted)]">Position</span> · {profile.career.position}
+                      {profile.career.height && ` · ${profile.career.height}`}
+                      {profile.career.weight && `, ${profile.career.weight}`}
+                    </p>
+                  )}
+                  {profile.career.years_pro != null && profile.career.years_pro > 0 && (
+                    <p><span className="text-[var(--text-muted)]">Experience</span> · {profile.career.years_pro} years pro</p>
+                  )}
                   {profile.career.draft && (
                     <p><span className="text-[var(--text-muted)]">Draft</span> · {profile.career.draft.replace(/^\d{4} draft · /, "")} ({profile.career.draft.slice(0, 4)})</p>
                   )}

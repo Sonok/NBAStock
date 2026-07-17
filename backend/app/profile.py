@@ -27,7 +27,7 @@ from . import ingest, store
 WIKI_SUMMARY = "https://en.wikipedia.org/api/rest_v1/page/summary/{title}"
 WIKI_WIKITEXT = (
     "https://en.wikipedia.org/w/api.php?action=query&prop=revisions&titles={title}"
-    "&rvslots=main&rvprop=content&rvsection=0&format=json&formatversion=2"
+    "&rvslots=main&rvprop=content&rvsection=0&redirects=1&format=json&formatversion=2"
 )
 BBREF_PLAYER = "https://www.basketball-reference.com/players/{initial}/{bbref_id}.html"
 HEADERS = ingest.BROWSER_HEADERS
@@ -165,13 +165,17 @@ def bio_and_nickname(name: str) -> dict:
             if not nicknames:
                 # most articles carry it in prose: nicknamed "the Joker",
                 # known by the nickname "King James", ...
-                for q in re.findall(
-                    r'nickname[sd]?[^"“]{0,40}["“]([^"”]{2,30})["”]', content, re.I
+                for match in re.findall(
+                    r'nickname[sd]?[^"“]{0,40}["“]([^"”]{2,30})["”]'
+                    r'(?:\s*(?:and|,|or)\s*["“]([^"”]{2,30})["”])?'
+                    r'(?:\s*(?:and|,|or)\s*["“]([^"”]{2,30})["”])?',
+                    content, re.I,
                 ):
-                    q = re.sub(r"[\[\]']", "", q).strip()
-                    if q and q not in nicknames:
-                        nicknames.append(q)
-            result["nickname"] = nicknames[:3]
+                    for q in match:
+                        q = re.sub(r"[\[\]']", "", q).strip()
+                        if q and q not in nicknames:
+                            nicknames.append(q)
+            result["nickname"] = nicknames[:4]
         except (requests.RequestException, KeyError, IndexError):
             pass
     return result
@@ -218,9 +222,12 @@ def _career_patches(bling: list[str]) -> list[dict]:
 
 
 def _career_from_wikitext(content: str) -> dict:
-    """Infobox career facts: highlights list, draft line, schools, medals."""
+    """Infobox career facts: highlights list, draft line, schools, vitals
+    (born/birthplace/position/height/weight/years pro), medals."""
     out: dict = {"highlights": [], "draft": None, "high_school": None,
-                 "college": None, "medals": []}
+                 "college": None, "medals": [], "birth_place": None,
+                 "born": None, "age": None, "position": None,
+                 "height": None, "weight": None, "years_pro": None}
 
     m = re.search(r"\|\s*highlights\s*=\s*(.*?)(?=\n\s*\|\s*\w+\s*=|\n\}\})", content, re.S)
     if m:
@@ -245,6 +252,30 @@ def _career_from_wikitext(content: str) -> dict:
         out["draft"] = f"{year} draft"
     out["high_school"] = field("high_school")
     out["college"] = field("college")
+    out["birth_place"] = field("birth_place")
+    out["position"] = (field("position") or "")[:40] or None
+
+    bm = re.search(r"\{\{[Bb]irth date(?: and age)?\s*\|(?:df=\w+\|)?(\d{4})\|(\d{1,2})\|(\d{1,2})", content)
+    if bm:
+        from datetime import date
+        y, mo, d = int(bm.group(1)), int(bm.group(2)), int(bm.group(3))
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        out["born"] = f"{months[mo - 1]} {d}, {y}"
+        today = date.today()
+        out["age"] = today.year - y - ((today.month, today.day) < (mo, d))
+
+    ft, inch = field("height_ft"), field("height_in")
+    if ft:
+        out["height"] = f"{ft}'{inch or 0}\""
+    lb = field("weight_lb") or field("weight_lbs")
+    if lb:
+        out["weight"] = f"{lb} lb"
+
+    start = field("career_start")
+    if start and start.isdigit():
+        from datetime import date
+        out["years_pro"] = max(date.today().year - int(start), 0)
 
     for metal, body in re.findall(
         r"\{\{Medal(Gold|Silver|Bronze)\s*\|(.*?)\}\}", content, re.S

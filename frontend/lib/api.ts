@@ -14,6 +14,13 @@ export interface Career {
   high_school: string | null;
   college: string | null;
   medals: { metal: "gold" | "silver" | "bronze"; event: string }[];
+  birth_place: string | null;
+  born: string | null;
+  age: number | null;
+  position: string | null;
+  height: string | null;
+  weight: string | null;
+  years_pro: number | null;
 }
 
 export interface Player {
