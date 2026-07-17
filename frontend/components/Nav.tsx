@@ -68,7 +68,7 @@ export default function Nav() {
   }
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-[var(--border-hairline)] bg-[rgba(13,13,13,0.85)] backdrop-blur">
+    <nav className="sticky top-0 z-40 border-b border-[var(--border-hairline)] bg-[rgba(10,11,13,0.85)] backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3">
         <Link href="/" className="text-sm font-bold uppercase tracking-[0.2em] text-[var(--text-primary)]">
           NBAStock

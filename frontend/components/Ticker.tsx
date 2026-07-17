@@ -22,7 +22,7 @@ export default function Ticker() {
 
   const items = [...movers, ...movers]; // duplicated for a seamless loop
   return (
-    <div className="ticker border-b border-[var(--border-hairline)] bg-[rgba(26,26,25,0.6)]">
+    <div className="ticker border-b border-[var(--border-hairline)] bg-[rgba(22,24,27,0.6)]">
       <div className="ticker-track items-center gap-8 py-1.5">
         {items.map((p, i) => {
           const up = p.change_30d_pct >= 0;

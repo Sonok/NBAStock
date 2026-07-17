@@ -90,7 +90,7 @@ export default function PlayerPage() {
         <div
           className="relative h-64"
           style={{
-            background: `radial-gradient(120% 170% at 85% -20%, ${colors.secondary}59 0%, transparent 50%), linear-gradient(150deg, ${colors.primary} 0%, ${colors.primary}dd 55%, #0d0d0d 135%)`,
+            background: `radial-gradient(120% 170% at 85% -20%, ${colors.secondary}59 0%, transparent 50%), linear-gradient(150deg, ${colors.primary} 0%, ${colors.primary}dd 55%, #0a0b0d 135%)`,
           }}
         >
           <div

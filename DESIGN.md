@@ -8,7 +8,10 @@ fight.
 
 ## Brand personality
 
-- **Dark by default.** One theme. The product is an evening product.
+- **Dark by default.** One theme — carbon black steel, not flat black: cool
+  gunmetal tones, a faint carbon weave in the page plane, panels that read
+  as milled plates (`.panel`: cool gradient, 1px top highlight, dark bottom
+  edge). The product is an evening product.
 - **The data is the only loud thing.** Chrome is recessive; prices, deltas,
   and team-color banners carry all the energy.
 - **Sports-card collectibility.** Tiers read as rarity (foil > silver >
@@ -21,13 +24,13 @@ Defined once in `frontend/app/globals.css` as CSS custom properties.
 
 | Token | Value | Role |
 |---|---|---|
-| `--page` | `#0d0d0d` | page plane (plus faint blue/red radial washes) |
-| `--surface-1` | `#1a1a19` | cards, nav, inputs, modals |
+| `--page` | `#0a0b0d` | carbon-steel page plane: cool gunmetal black with a ~3%-contrast carbon-fiber weave and a cold top sheen |
+| `--surface-1` | `#16181b` | cards, nav, inputs, modals |
 | `--text-primary` | `#ffffff` | headline ink |
-| `--text-secondary` | `#c3c2b7` | supporting ink |
-| `--text-muted` | `#898781` | labels, axis text |
-| `--gridline` | `#2c2c2a` | hairlines inside charts |
-| `--baseline` | `#383835` | chart baselines, scrollbar |
+| `--text-secondary` | `#c2c5cb` | supporting ink (cool) |
+| `--text-muted` | `#83878e` | labels, axis text (cool) |
+| `--gridline` | `#24272c` | hairlines inside charts |
+| `--baseline` | `#33373d` | chart baselines, scrollbar |
 | `--border-hairline` | `rgba(255,255,255,0.10)` | card/nav borders |
 | `--series-pos` | `#3987e5` | positive z-score bars (cool pole) |
 | `--series-neg` | `#e66767` | negative z-score bars (warm pole) |

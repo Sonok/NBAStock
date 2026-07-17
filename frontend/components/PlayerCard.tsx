@@ -100,7 +100,7 @@ export default function PlayerCard({ player }: { player: Player }) {
       <div
         className="relative h-28"
         style={{
-          background: `radial-gradient(120% 160% at 85% -20%, ${colors.secondary}66 0%, transparent 50%), linear-gradient(150deg, ${colors.primary} 0%, ${colors.primary}dd 55%, #101010 130%)`,
+          background: `radial-gradient(120% 160% at 85% -20%, ${colors.secondary}66 0%, transparent 50%), linear-gradient(150deg, ${colors.primary} 0%, ${colors.primary}dd 55%, #0c0e11 130%)`,
         }}
       >
         {/* halftone dots, fading out toward the right */}

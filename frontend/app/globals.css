@@ -3,14 +3,14 @@
 @tailwind utilities;
 
 :root {
-  /* Dark-mode tokens (validated dataviz palette) */
-  --page: #0d0d0d;
-  --surface-1: #1a1a19;
+  /* Carbon-steel dark tokens (cool gunmetal, validated dataviz palette) */
+  --page: #0a0b0d;
+  --surface-1: #16181b;
   --text-primary: #ffffff;
-  --text-secondary: #c3c2b7;
-  --text-muted: #898781;
-  --gridline: #2c2c2a;
-  --baseline: #383835;
+  --text-secondary: #c2c5cb;
+  --text-muted: #83878e;
+  --gridline: #24272c;
+  --baseline: #33373d;
   --border-hairline: rgba(255, 255, 255, 0.1);
   --series-pos: #3987e5; /* diverging cool pole (positive z) */
   --series-neg: #e66767; /* diverging warm pole (negative z) */
@@ -19,10 +19,28 @@
 }
 
 body {
-  background:
-    radial-gradient(90rem 40rem at 70% -20%, rgba(57, 135, 229, 0.07), transparent 60%),
-    radial-gradient(70rem 35rem at 0% 10%, rgba(230, 103, 103, 0.04), transparent 55%),
-    var(--page);
+  /* Carbon black steel: a faint carbon-fiber weave under a cold top sheen.
+     Texture sits at ~2-4% contrast so data surfaces stay clean on top. */
+  background-color: var(--page);
+  background-image:
+    linear-gradient(180deg, rgba(151, 168, 190, 0.05) 0%, transparent 22rem),
+    radial-gradient(rgba(0, 0, 0, 0.5) 15%, transparent 16%),
+    radial-gradient(rgba(0, 0, 0, 0.5) 15%, transparent 16%),
+    radial-gradient(rgba(200, 210, 224, 0.03) 15%, transparent 20%),
+    radial-gradient(rgba(200, 210, 224, 0.03) 15%, transparent 20%);
+  background-size:
+    100% 100%,
+    14px 14px,
+    14px 14px,
+    14px 14px,
+    14px 14px;
+  background-position:
+    0 0,
+    0 0,
+    7px 7px,
+    0 1px,
+    7px 8px;
+  background-attachment: fixed;
   color: var(--text-primary);
   font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -36,15 +54,16 @@ body {
   scrollbar-color: var(--baseline) transparent;
 }
 
-/* Machined panel surface: soft vertical gradient + 1px inner top highlight,
-   quieter than a bordered box */
+/* Machined steel panel: cool vertical gradient, sharp edges, milled top
+   highlight + darker bottom edge — reads as a cut plate, not a card */
 .panel {
-  border-radius: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: linear-gradient(180deg, #1d1d1c 0%, #161615 100%);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #1b1e22 0%, #131518 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 8px 24px -16px rgba(0, 0, 0, 0.8);
+    inset 0 1px 0 rgba(220, 230, 245, 0.07),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    0 10px 28px -18px rgba(0, 0, 0, 0.9);
 }
 
 /* Price line draws itself once on load */
