@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import FadeOnScroll from "@/components/FadeOnScroll";
 import FeedPanel from "@/components/FeedPanel";
 import PlayerCard from "@/components/PlayerCard";
 import { fetchPlayers, type PlayersResponse } from "@/lib/api";
@@ -136,7 +137,9 @@ export default function MarketPage() {
 
         <aside className="shrink-0 lg:w-80">
           <div className="lg:sticky lg:top-24">
-            <FeedPanel />
+            <FadeOnScroll>
+              <FeedPanel />
+            </FadeOnScroll>
           </div>
         </aside>
       </div>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import FadeOnScroll from "@/components/FadeOnScroll";
 import FeedPanel from "@/components/FeedPanel";
 import Patches from "@/components/Patches";
 import { BreakdownBar } from "@/components/PlayerCard";
@@ -404,7 +405,9 @@ export default function PlayerPage() {
             </div>
           )}
           <div className="lg:sticky lg:top-24">
-            <FeedPanel playerId={player.player_id} title={`${player.name.split(" ").slice(-1)[0]} news`} />
+            <FadeOnScroll>
+              <FeedPanel playerId={player.player_id} title={`${player.name.split(" ").slice(-1)[0]} news`} />
+            </FadeOnScroll>
           </div>
         </aside>
       </div>

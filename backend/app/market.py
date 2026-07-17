@@ -14,7 +14,8 @@ import json
 from . import ingest, popularity, store
 from .pricing import price_players
 
-EVENT_MOVE_PCT = 0.5      # a reprice move this big becomes a feed event
+EVENT_MOVE_PCT = 3.0      # only story-sized moves become feed events —
+                          # sub-3% drift is just collection noise
 SNAPSHOT_MOVE_PCT = 0.25  # ...this big becomes a price-history point
 
 
