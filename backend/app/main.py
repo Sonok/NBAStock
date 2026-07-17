@@ -301,10 +301,16 @@ def get_leaderboard(season: str = ingest.DEFAULT_SEASON) -> dict:
 
 @app.get("/api/feed")
 def feed(since_id: int = 0, limit: int = 50, player_id: int = 0) -> dict:
-    events = store.events_since(since_id, limit if not player_id else 200)
+    """The notable-events feed is editorial: news, signals, roster moves,
+    live plays. Price moves are numbers — they live in the ticker and the
+    charts, not here."""
+    events = [
+        e for e in store.events_since(since_id, 300)
+        if e["type"] != "price_move"
+    ]
     if player_id:
-        events = [e for e in events if e["player_id"] == player_id][:limit]
-    return {"events": events}
+        events = [e for e in events if e["player_id"] == player_id]
+    return {"events": events[:limit]}
 
 
 @app.get("/api/feed/stream")
