@@ -57,10 +57,32 @@ export default function PlayerPage() {
   const colors = teamColors(player.team_abbr);
   const up = player.change_30d_pct >= 0;
 
+  const SectionHeader = ({ label }: { label: string }) => (
+    <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+      <span
+        className="inline-block h-[3px] w-4 rounded-full"
+        style={{ background: colors.primary === "#111111" || colors.primary === "#161616" ? colors.secondary : colors.primary }}
+      />
+      {label}
+    </h2>
+  );
+
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      <Link href="/" className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-        ← Market
+    <div className="relative">
+      {/* ambient team-color wash bleeding down from the hero */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[36rem]"
+        style={{
+          background: `radial-gradient(70% 28rem at 50% 0%, ${colors.primary}2e 0%, transparent 70%)`,
+        }}
+      />
+      <main className="relative mx-auto max-w-5xl px-4 py-8">
+      <Link
+        href="/"
+        className="group inline-flex items-center gap-1 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+      >
+        <span className="transition-transform group-hover:-translate-x-0.5">←</span> Market
       </Link>
 
       {/* Letterman hero: team-color jacket, giant cutout, varsity type */}
@@ -138,13 +160,13 @@ export default function PlayerPage() {
             </div>
             <button
               onClick={() => setTrade("buy")}
-              className="rounded-lg bg-[var(--delta-good)] px-5 py-2.5 font-semibold text-white hover:opacity-90"
+              className="rounded-lg bg-[var(--delta-good)] px-5 py-2.5 font-semibold text-white shadow-[0_4px_24px_-6px_rgba(12,163,12,0.55)] transition-all hover:opacity-90 active:scale-[0.98]"
             >
               Buy
             </button>
             <button
               onClick={() => setTrade("sell")}
-              className="rounded-lg border border-[var(--border-hairline)] px-5 py-2.5 font-semibold hover:border-[var(--delta-bad)] hover:text-[var(--delta-bad)]"
+              className="rounded-lg border border-[var(--border-hairline)] px-5 py-2.5 font-semibold transition-all hover:border-[var(--delta-bad)] hover:text-[var(--delta-bad)] active:scale-[0.98]"
             >
               Sell
             </button>
@@ -154,10 +176,8 @@ export default function PlayerPage() {
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
-          <section className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-              Price history
-            </h2>
+          <section className="panel p-5">
+            <SectionHeader label="Price history" />
             <div className="mt-3">
               {history ? (
                 <PriceChart dates={history.dates} prices={history.prices} />
@@ -167,16 +187,14 @@ export default function PlayerPage() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-              Why this price
-            </h2>
+          <section className="panel p-5">
+            <SectionHeader label="Why this price" />
             <div className="mt-4 max-w-md space-y-2.5">
               <BreakdownBar label="Perf" z={player.perf_z} />
               <BreakdownBar label="Pop" z={player.pop_z} />
               <BreakdownBar label="Team" z={player.team_z} />
             </div>
-            <div className="mt-5 grid grid-cols-4 gap-3 border-t border-[var(--border-hairline)] pt-4 sm:grid-cols-8">
+            <div className="mt-5 grid grid-cols-4 divide-x divide-[var(--border-hairline)] border-t border-[var(--border-hairline)] pt-4 sm:grid-cols-8">
               {[
                 ["PPG", player.stats.pts.toFixed(1)],
                 ["RPG", player.stats.reb.toFixed(1)],
@@ -187,8 +205,8 @@ export default function PlayerPage() {
                 ["GP", String(player.stats.gp)],
                 ["WIN%", `${Math.round(player.stats.team_win_pct * 100)}`],
               ].map(([label, value]) => (
-                <div key={label} className="text-center">
-                  <p className="text-lg font-semibold">{value}</p>
+                <div key={label} className="px-1 text-center">
+                  <p className="text-lg font-semibold tabular-nums">{value}</p>
                   <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                     {label}
                   </p>
@@ -204,11 +222,9 @@ export default function PlayerPage() {
           </section>
 
           {profile?.ratings?.attributes && (
-            <section className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-5">
+            <section className="panel p-5">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                  Scouting report
-                </h2>
+                <SectionHeader label="Scouting report" />
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-3xl font-black tabular-nums">{profile.ratings.overall}</span>
                   <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
@@ -249,10 +265,8 @@ export default function PlayerPage() {
           )}
 
           {!!profile?.shot_zones?.length && (
-            <section className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-5">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                Shot profile
-              </h2>
+            <section className="panel p-5">
+              <SectionHeader label="Shot profile" />
               <div className="mt-4">
                 <ShotZones zones={profile.shot_zones} />
               </div>
@@ -262,7 +276,7 @@ export default function PlayerPage() {
 
         <aside className="space-y-6">
           {profile?.bio && (
-            <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+            <div className="panel p-4">
               <h2 className="text-sm font-semibold uppercase tracking-wide">About</h2>
               {profile.nickname.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -298,6 +312,7 @@ export default function PlayerPage() {
       </div>
 
       {trade && <TradeModal player={player} action={trade} onClose={() => setTrade(null)} />}
-    </main>
+      </main>
+    </div>
   );
 }

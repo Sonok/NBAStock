@@ -32,11 +32,10 @@ export default function Patches({ badges }: { badges: Badge[] }) {
         return (
           <span
             key={`${b.code}-${b.label}`}
-            className="inline-block rounded-lg p-[3px] shadow-[0_3px_8px_rgba(0,0,0,0.45)]"
-            style={{
-              background: s.outer,
-              transform: `rotate(${i % 2 === 0 ? -1.6 : 1.3}deg)`,
-            }}
+            className={`inline-block rounded-lg p-[3px] shadow-[0_3px_8px_rgba(0,0,0,0.45)] transition-transform duration-200 hover:rotate-0 hover:scale-105 ${
+              i % 2 === 0 ? "-rotate-[1.6deg]" : "rotate-[1.3deg]"
+            }`}
+            style={{ background: s.outer }}
             title={b.label}
           >
             <span

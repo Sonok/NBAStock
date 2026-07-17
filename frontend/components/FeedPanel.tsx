@@ -94,7 +94,7 @@ export default function FeedPanel({
   }, [playerId]);
 
   return (
-    <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-4">
+    <div className="panel p-4">
       <div className="flex items-center gap-2">
         <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--delta-good)] opacity-60" />
