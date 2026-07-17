@@ -45,6 +45,7 @@ export default function Patches({ badges }: { badges: Badge[] }) {
                 color: b.tier === "felt" ? "var(--text-secondary)" : s.inner,
               }}
             >
+              {(b.count ?? 1) > 1 && <span className="mr-1 opacity-80">{b.count}×</span>}
               {b.label}
             </span>
           </span>

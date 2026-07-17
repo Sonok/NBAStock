@@ -12,6 +12,9 @@ independent loops, all writing to the store:
             and flip tempo to `live` for a window
   plays     minute-by-minute notable plays (games.py) while games are live —
             dunks, alley-oops, blocks, clutch threes, straight into the feed
+  career    slow info-dump aggregator (profile.py) — one player per cycle,
+            full league every ~5 weeks: career awards, highlights, draft,
+            schools, medals, bio, shot zones
   reprice   EVENT-DRIVEN, not wall-clock: collectors bump a data_version
             in the store; this loop polls the version and only reprices
             when inputs actually changed. A quiet offseason night produces
@@ -36,7 +39,7 @@ from datetime import datetime, timezone
 
 import requests
 
-from . import games, ingest, market, news, popularity, signals, store
+from . import games, ingest, market, news, popularity, profile, signals, store
 
 log = logging.getLogger("nbastock.scheduler")
 
@@ -50,6 +53,8 @@ NEWS_SECONDS = 900
 SIGNALS_SECONDS = 120
 PLAYS_SECONDS = 20      # play-by-play cadence while games are live
 PLAYS_IDLE_SECONDS = 300  # how often to re-check when nothing is live
+CAREER_SECONDS = 7200   # one player's career/profile re-aggregated per cycle
+                        # (~400 priced players -> full league every ~5 weeks)
 SEASON = ingest.DEFAULT_SEASON
 
 
@@ -149,6 +154,23 @@ async def _plays_loop() -> None:
         await asyncio.sleep(PLAYS_SECONDS if live else PLAYS_IDLE_SECONDS)
 
 
+async def _career_loop() -> None:
+    """Slow info-dump aggregator: every cycle, rebuild one player's full
+    scouting profile — career awards (bbref bling), Wikipedia highlights,
+    draft line, schools, medals, bio, shot zones. The whole league turns
+    over every month or so, keeping resumes fresh without hammering
+    anyone's servers."""
+    while True:
+        try:
+            pid = await asyncio.to_thread(store.stalest_profile, SEASON)
+            if pid is not None:
+                await asyncio.to_thread(profile.get, SEASON, pid, True)
+                log.info("career: refreshed profile for %s", pid)
+        except Exception:
+            log.exception("career aggregation failed")
+        await asyncio.sleep(CAREER_SECONDS)
+
+
 async def _reprice_loop() -> None:
     last_version = store.get_meta("data_version")
     while True:
@@ -167,5 +189,5 @@ async def _reprice_loop() -> None:
 async def run() -> None:
     await asyncio.gather(
         _trickle_loop(), _stats_loop(), _news_loop(), _signals_loop(),
-        _plays_loop(), _reprice_loop(),
+        _plays_loop(), _career_loop(), _reprice_loop(),
     )

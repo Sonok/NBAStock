@@ -44,6 +44,35 @@ RATING_KEYS = [
 
 ZONES = ["0-3", "3-10", "10-16", "16-3P", "3P"]
 
+# career award label -> patch tier. Gold = hardware won, silver = teams and
+# statistical titles, felt = everything else on the résumé.
+GOLD_AWARDS = (
+    "MVP", "NBA Champion", "Finals MVP", "DPOY", "ROY", "Scoring Champ",
+    "Sixth Man", "Most Improved", "Clutch Player",
+)
+SILVER_AWARDS = (
+    "All-NBA", "All-Star", "All-Defensive", "Rebounding Champ",
+    "Assists Champ", "Steals Champ", "Blocks Champ", "Conf. Finals MVP",
+)
+
+BLING_LABELS = {
+    "All Star": "All-Star",
+    "NBA Champ": "NBA Champion",
+    "ABA Champ": "ABA Champion",
+    "TRB Champ": "Rebounding Champ",
+    "AST Champ": "Assists Champ",
+    "STL Champ": "Steals Champ",
+    "BLK Champ": "Blocks Champ",
+    "Scoring Champ": "Scoring Champ",
+    "Def. POY": "DPOY",
+    "WCF MVP": "Conf. Finals MVP",
+    "ECF MVP": "Conf. Finals MVP",
+    "AS MVP": "All-Star MVP",
+    "6MOY": "Sixth Man",
+    "MIP": "Most Improved",
+    "CPOY": "Clutch Player",
+}
+
 
 # ------------------------------------------------------------- ratings
 
@@ -94,7 +123,7 @@ def _wiki_candidates(name: str) -> list[str]:
 
 
 def bio_and_nickname(name: str) -> dict:
-    result = {"bio": "", "nickname": [], "wiki_url": ""}
+    result = {"bio": "", "nickname": [], "wiki_url": "", "_career_wiki": {}}
     title_used = None
     for title in _wiki_candidates(name):
         try:
@@ -122,6 +151,7 @@ def bio_and_nickname(name: str) -> dict:
                 headers=HEADERS, timeout=15,
             )
             content = r.json()["query"]["pages"][0]["revisions"][0]["slots"]["main"]["content"]
+            result["_career_wiki"] = _career_from_wikitext(content)
             nicknames: list[str] = []
             m = re.search(r"\|\s*nickname\s*=\s*(.+)", content)
             if m:
@@ -147,21 +177,115 @@ def bio_and_nickname(name: str) -> dict:
     return result
 
 
+# ------------------------------------------------------------- career
+
+def _clean_wikitext(s: str) -> str:
+    s = re.sub(r"<!--.*?-->", "", s, flags=re.S)
+    s = re.sub(r"\{\{nbay\|(\d{4})\|end\}\}", lambda m: str(int(m.group(1)) + 1), s)
+    s = re.sub(r"\{\{nasg\|(\d{4})[^}]*\}\}", r"\1", s)
+    s = re.sub(r"\{\{[^{}]*\}\}", "", s)
+    s = re.sub(r"\[\[[^|\]]*\|([^\]]*)\]\]", r"\1", s)
+    s = re.sub(r"\[\[([^\]]*)\]\]", r"\1", s)
+    s = re.sub(r"<[^>]+>", "", s)
+    s = s.replace("'''", "").replace("''", "")
+    return re.sub(r"\s+", " ", s).strip(" ,;")
+
+
+def _career_patches(bling: list[str]) -> list[dict]:
+    """bbref bling items ('8x All Star', '2023 NBA Champ') -> letterman
+    patches with counts and prestige tiers."""
+    patches = []
+    for item in bling:
+        count = 1
+        label = item.strip()
+        m = re.match(r"(\d+)x\s+(.*)", label)
+        if m:
+            count = int(m.group(1))
+            label = m.group(2).strip()
+        # strip a leading season/year ('2023 NBA Champ', '2025-26 TRB Champ')
+        label = re.sub(r"^\d{4}(?:-\d{2})?\s+", "", label)
+        label = BLING_LABELS.get(label, label)
+        # silver first: "Conf. Finals MVP" must not substring-match "Finals MVP"
+        tier = (
+            "silver" if any(sv in label for sv in SILVER_AWARDS)
+            else "gold" if any(g in label for g in GOLD_AWARDS)
+            else "felt"
+        )
+        patches.append({"code": label, "label": label, "tier": tier, "count": count})
+    order = {"gold": 0, "silver": 1, "felt": 2}
+    patches.sort(key=lambda p: (order[p["tier"]], -p["count"]))
+    return patches
+
+
+def _career_from_wikitext(content: str) -> dict:
+    """Infobox career facts: highlights list, draft line, schools, medals."""
+    out: dict = {"highlights": [], "draft": None, "high_school": None,
+                 "college": None, "medals": []}
+
+    m = re.search(r"\|\s*highlights\s*=\s*(.*?)(?=\n\s*\|\s*\w+\s*=|\n\}\})", content, re.S)
+    if m:
+        for line in m.group(1).splitlines():
+            line = line.strip()
+            if line.startswith("*"):
+                cleaned = _clean_wikitext(line.lstrip("* "))
+                if 2 < len(cleaned) <= 90:
+                    out["highlights"].append(cleaned)
+
+    def field(name: str) -> str | None:
+        fm = re.search(r"\|\s*" + name + r"\s*=\s*(.+)", content)
+        if not fm:
+            return None
+        val = _clean_wikitext(fm.group(1))
+        return val or None
+
+    year, rnd, pick = field("draft_year"), field("draft_round"), field("draft_pick")
+    if year and rnd and pick:
+        out["draft"] = f"{year} draft · round {rnd}, pick {pick}"
+    elif year:
+        out["draft"] = f"{year} draft"
+    out["high_school"] = field("high_school")
+    out["college"] = field("college")
+
+    for metal, body in re.findall(
+        r"\{\{Medal(Gold|Silver|Bronze)\s*\|(.*?)\}\}", content, re.S
+    ):
+        event = _clean_wikitext(body).replace("|", " · ")
+        event = re.sub(r"\s*·\s*", " · ", event).strip(" ·")
+        if event:
+            out["medals"].append({"metal": metal.lower(), "event": event[:80]})
+    return out
+
+
+def _bling(html: str) -> list[str]:
+    m = re.search(r'<ul id="bling">(.*?)</ul>', html, re.S)
+    if not m:
+        return []
+    return [
+        _clean_wikitext(item)
+        for item in re.findall(r"<li[^>]*>(?:<a[^>]*>)?([^<]+)", m.group(1))
+    ]
+
+
 # ------------------------------------------------------------- shot zones
 
-def shot_zones(bbref_id: str, season: str) -> list[dict]:
-    """Share of FGA and FG% by distance band from the bbref player page."""
+def _bbref_html(bbref_id: str) -> str:
     if not bbref_id:
-        return []
-    year_label = f"{season.split('-')[0]}-{season.split('-')[1]}"
+        return ""
     url = BBREF_PLAYER.format(initial=bbref_id[0], bbref_id=bbref_id)
     try:
         r = requests.get(url, headers=HEADERS, timeout=25)
         r.raise_for_status()
         r.encoding = "utf-8"
-        html = r.text
+        return r.text
     except requests.RequestException:
+        return ""
+
+
+def shot_zones(html: str, season: str) -> list[dict]:
+    """Share of FGA and FG% by distance band from the bbref player page."""
+    if not html:
         return []
+    year_label = f"{season.split('-')[0]}-{season.split('-')[1]}"
 
     for df in ingest._read_tables(html):
         if not isinstance(df.columns, pd.MultiIndex):
@@ -199,11 +323,18 @@ def get(season: str, player_id: int, refresh: bool = False) -> dict | None:
     )
     if me is None:
         return None
+    wiki = bio_and_nickname(me["name"])
+    career_wiki = wiki.pop("_career_wiki", {})
+    bbref_html = _bbref_html(me.get("bbref_id") or "")
     profile = {
         "player_id": player_id,
-        **bio_and_nickname(me["name"]),
+        **wiki,
         "ratings": ratings(season, player_id),
-        "shot_zones": shot_zones(me.get("bbref_id") or "", season),
+        "shot_zones": shot_zones(bbref_html, season),
+        "career": {
+            "patches": _career_patches(_bling(bbref_html)),
+            **career_wiki,
+        },
     }
     store.set_profile(season, player_id, profile)
     return profile

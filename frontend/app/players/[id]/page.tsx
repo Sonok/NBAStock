@@ -147,7 +147,9 @@ export default function PlayerPage() {
 
         {/* patch row — sewn under the banner like a jacket chest */}
         <div className="flex flex-wrap items-center justify-between gap-4 bg-[var(--surface-1)] px-6 py-4">
-          {player.badges.length > 0 ? (
+          {profile?.career?.patches?.length ? (
+            <Patches badges={profile.career.patches} />
+          ) : player.badges.length > 0 ? (
             <Patches badges={player.badges} />
           ) : (
             <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">
@@ -281,6 +283,23 @@ export default function PlayerPage() {
               </div>
             </section>
           )}
+
+          {!!profile?.career?.highlights?.length && (
+            <section className="panel p-5">
+              <SectionHeader label="Career honors" />
+              <ul className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+                {profile.career.highlights.map((h) => (
+                  <li key={h} className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
+                    <span className="mt-[7px] inline-block h-1 w-1 shrink-0 rounded-full bg-[var(--text-muted)]" />
+                    {h}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-4 text-xs text-[var(--text-muted)]">
+                Aggregated from Basketball-Reference and Wikipedia · refreshed on a rolling monthly cycle
+              </p>
+            </section>
+          )}
         </div>
 
         <aside className="space-y-6">
@@ -302,6 +321,31 @@ export default function PlayerPage() {
               <p className="mt-2.5 text-sm leading-relaxed text-[var(--text-secondary)]">
                 {profile.bio.length > 420 ? `${profile.bio.slice(0, 420)}…` : profile.bio}
               </p>
+              {profile.career && (
+                <div className="mt-3 space-y-1.5 border-t border-[var(--border-hairline)] pt-3 text-xs text-[var(--text-secondary)]">
+                  {profile.career.draft && (
+                    <p><span className="text-[var(--text-muted)]">Draft</span> · {profile.career.draft.replace(/^\d{4} draft · /, "")} ({profile.career.draft.slice(0, 4)})</p>
+                  )}
+                  {profile.career.college && (
+                    <p><span className="text-[var(--text-muted)]">College</span> · {profile.career.college}</p>
+                  )}
+                  {profile.career.high_school && (
+                    <p><span className="text-[var(--text-muted)]">High school</span> · {profile.career.high_school}</p>
+                  )}
+                  {profile.career.medals.map((m, i) => (
+                    <p key={i} className="flex items-center gap-1.5">
+                      <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{
+                          background:
+                            m.metal === "gold" ? "#e7c766" : m.metal === "silver" ? "#c9c9c9" : "#b08d57",
+                        }}
+                      />
+                      {m.metal[0].toUpperCase() + m.metal.slice(1)} · {m.event}
+                    </p>
+                  ))}
+                </div>
+              )}
               {profile.wiki_url && (
                 <a
                   href={profile.wiki_url}

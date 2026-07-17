@@ -416,6 +416,21 @@ def set_profile(season: str, player_id: int, profile: dict) -> None:
         )
 
 
+def stalest_profile(season: str) -> int | None:
+    """Priced player whose scouting profile is oldest (or missing) — next in
+    the slow career-aggregation queue."""
+    with _lock, _conn() as conn:
+        row = conn.execute(
+            """SELECT p.player_id FROM players p
+               LEFT JOIN profiles pr ON pr.season = p.season AND pr.player_id = p.player_id
+               WHERE p.season = ? AND p.price IS NOT NULL
+               ORDER BY pr.fetched_at IS NOT NULL, pr.fetched_at
+               LIMIT 1""",
+            (season,),
+        ).fetchone()
+        return row["player_id"] if row else None
+
+
 def events_since(last_id: int, limit: int = 50) -> list[dict]:
     with _lock, _conn() as conn:
         return [

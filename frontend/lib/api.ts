@@ -4,6 +4,16 @@ export interface Badge {
   code: string;
   label: string;
   tier: "gold" | "silver" | "felt";
+  count?: number;
+}
+
+export interface Career {
+  patches: Badge[];
+  highlights: string[];
+  draft: string | null;
+  high_school: string | null;
+  college: string | null;
+  medals: { metal: "gold" | "silver" | "bronze"; event: string }[];
 }
 
 export interface Player {
@@ -112,6 +122,7 @@ export interface Profile {
     weaknesses?: string[];
   };
   shot_zones: ShotZone[];
+  career?: Career;
 }
 
 export async function fetchProfile(playerId: number): Promise<Profile> {
