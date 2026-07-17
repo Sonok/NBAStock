@@ -41,6 +41,7 @@ export interface Player {
   spark: number[];
   change_30d_pct: number;
   wiki_views: number | null;
+  factors?: Record<string, number>;
   badges: Badge[];
   stats: {
     gp: number;

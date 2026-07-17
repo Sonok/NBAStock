@@ -145,6 +145,7 @@ def _market_rows(season: str) -> list[dict]:
                     "game_score": r["game_score"],
                     "tier": r["tier"],
                     "wiki_views": r["wiki_views"],
+                    "factors": json.loads(r["factors"]) if r["factors"] else {},
                     "badges": parse_badges(r["awards"]),
                     "rank": i + 1,
                     "headshot": f"/api/headshots/{r['player_id']}.png",

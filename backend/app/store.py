@@ -27,7 +27,7 @@ _lock = threading.Lock()
 STAT_COLS = [
     "gp", "min", "pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "tov",
     "pf", "fgm", "fga", "ftm", "fta", "fg3m", "team_win_pct", "dd2", "td3",
-    "plus_minus",
+    "plus_minus", "age",
 ]
 
 # raw ingest row key -> players column
@@ -36,7 +36,7 @@ ROW_TO_COL = {
     "DREB": "dreb", "AST": "ast", "STL": "stl", "BLK": "blk", "TOV": "tov",
     "PF": "pf", "FGM": "fgm", "FGA": "fga", "FTM": "ftm", "FTA": "fta",
     "FG3M": "fg3m", "W_PCT": "team_win_pct", "DD2": "dd2", "TD3": "td3",
-    "PLUS_MINUS": "plus_minus",
+    "PLUS_MINUS": "plus_minus", "AGE": "age",
 }
 
 
@@ -122,6 +122,8 @@ def init() -> None:
             "ALTER TABLE events ADD COLUMN url TEXT",
             "ALTER TABLE players ADD COLUMN awards TEXT",
             "ALTER TABLE players ADD COLUMN bbref_id TEXT",
+            "ALTER TABLE players ADD COLUMN age REAL NOT NULL DEFAULT 26",
+            "ALTER TABLE players ADD COLUMN factors TEXT",
         ):
             try:
                 conn.execute(migration)
@@ -186,16 +188,19 @@ def upsert_daily_views(season: str, player_id: int, series: dict[str, int]) -> N
 
 
 def set_prices(season: str, priced: list[PricedPlayer]) -> None:
+    import json as _json
+
     now = _now()
     with _lock, _conn() as conn:
         conn.executemany(
             """UPDATE players SET price=?, composite=?, perf_z=?, pop_z=?, team_z=?,
-               momentum_z=?, game_score=?, tier=?, wiki_views=?, priced_at=?
+               momentum_z=?, game_score=?, tier=?, wiki_views=?, factors=?, priced_at=?
                WHERE season=? AND player_id=?""",
             [
                 (
                     p.price, p.composite, p.perf_z, p.pop_z, p.team_z,
-                    p.momentum_z, p.game_score, p.tier, p.wiki_views, now,
+                    p.momentum_z, p.game_score, p.tier, p.wiki_views,
+                    _json.dumps(p.factors), now,
                     season, p.player_id,
                 )
                 for p in priced
@@ -338,7 +343,9 @@ def player_inputs(season: str) -> list[PlayerInputs]:
     from . import popularity
 
     totals = view_totals(season)
-    decayed = popularity.decayed_attention(get_daily_views(season))
+    daily = get_daily_views(season)
+    decayed = popularity.decayed_attention(daily)
+    short = popularity.decayed_attention(daily, half_life_days=7)
     return [
         PlayerInputs(
             player_id=r["player_id"],
@@ -368,6 +375,9 @@ def player_inputs(season: str) -> list[PlayerInputs]:
             wiki_views=totals.get(r["player_id"]) or None,
             wiki_views_recent=(round(decayed[str(r["player_id"])]) or None)
             if str(r["player_id"]) in decayed else None,
+            wiki_views_short=(round(short[str(r["player_id"])]) or None)
+            if str(r["player_id"]) in short else None,
+            age=r["age"] or 26.0,
         )
         for r in get_players(season)
     ]

@@ -241,6 +241,7 @@ def refresh(season: str = DEFAULT_SEASON) -> dict:
                 "FTA": _num(stat_row, "FTA"),
                 "FG3M": _num(stat_row, "3P"),
                 "W_PCT": standings.get(abbr, 0.5),
+                "AGE": _num(stat_row, "Age", 26.0),
                 "AWARDS": "" if pd.isna(stat_row.get("Awards")) else str(stat_row.get("Awards", "")),
                 "BBREF_ID": bbref_ids.get(norm, ""),
                 "DD2": 0,   # not in the per-game table; star_power tolerates 0

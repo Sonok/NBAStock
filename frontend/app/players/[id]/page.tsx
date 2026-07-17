@@ -247,10 +247,40 @@ export default function PlayerPage() {
           <section className="panel p-5">
             <SectionHeader label="Why this price" />
             <div className="mt-4 max-w-md space-y-2.5">
-              <BreakdownBar label="Perf" z={player.perf_z} />
-              <BreakdownBar label="Pop" z={player.pop_z} />
-              <BreakdownBar label="Team" z={player.team_z} />
+              {(
+                [
+                  ["performance", "Perf"],
+                  ["projection", "Proj"],
+                  ["popularity", "Pop"],
+                  ["momentum", "Mom"],
+                  ["team", "Team"],
+                  ["team_direction", "Dir"],
+                  ["teammates", "Cast"],
+                  ["sentiment", "Buzz"],
+                  ["matchup", "H2H"],
+                ] as const
+              )
+                .filter(([key]) => {
+                  const z = player.factors?.[key];
+                  // hide inert factors (sentiment/matchup pre-wiring) at exactly 0
+                  return z !== undefined && !(z === 0 && (key === "sentiment" || key === "matchup"));
+                })
+                .map(([key, label]) => (
+                  <BreakdownBar key={key} label={label} z={player.factors![key]!} />
+                ))}
+              {!player.factors && (
+                <>
+                  <BreakdownBar label="Perf" z={player.perf_z} />
+                  <BreakdownBar label="Pop" z={player.pop_z} />
+                  <BreakdownBar label="Team" z={player.team_z} />
+                </>
+              )}
             </div>
+            <p className="mt-3 text-xs text-[var(--text-muted)]">
+              Nine-factor model, season-phase weighted (currently offseason: volatile
+              factors damped). Projection = age-curve forecast; Buzz and H2H activate
+              with sentiment feeds and in-season matchup data. See MODEL.md.
+            </p>
             <div className="mt-5 grid grid-cols-4 divide-x divide-[var(--border-hairline)] border-t border-[var(--border-hairline)] pt-4 sm:grid-cols-8">
               {[
                 ["PPG", player.stats.pts.toFixed(1)],

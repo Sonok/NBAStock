@@ -39,13 +39,13 @@ TIMEOUT = 15
 MAX_RETRIES = 4
 
 
-def decayed_attention(daily: dict[str, dict[str, int]]) -> dict[str, float]:
+def decayed_attention(daily: dict[str, dict[str, int]], half_life_days: int | None = None) -> dict[str, float]:
     """player_id_str -> exponentially-decayed view sum as of the newest date
     in the dataset. S_t = S_(t-1) * lambda + views_t, with lambda set by
     DECAY_HALF_LIFE_DAYS. Smooth momentum without a window cliff."""
     from datetime import date as _date
 
-    lam = 0.5 ** (1.0 / DECAY_HALF_LIFE_DAYS)
+    lam = 0.5 ** (1.0 / (half_life_days or DECAY_HALF_LIFE_DAYS))
 
     def to_ord(d: str) -> int:
         return _date(int(d[:4]), int(d[4:6]), int(d[6:8])).toordinal()

@@ -58,6 +58,13 @@ Reprice moves ≥0.5% become events: `GET /api/feed` (recent) and
 Players need 15+ games and 12+ min/game to qualify. A league-average player is
 $30; Jokić-tier is ~$300; deep bench is ~$11.
 
+## The pricing model
+
+Nine phase-weighted factors — performance, age-curve projection, decayed
+attention, momentum, team strength, team direction, teammate quality, and
+pluggable sentiment/matchup slots — fully documented with formulas, weights,
+and the ideas backlog in **[MODEL.md](MODEL.md)**.
+
 ## Design
 
 The UI language — tokens, the player-card anatomy, color lanes, motion and

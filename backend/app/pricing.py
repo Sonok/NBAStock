@@ -68,7 +68,9 @@ class PlayerInputs:
     plus_minus: float
     last10_game_score: float | None = None
     wiki_views: int | None = None  # season Wikipedia pageviews (fame display)
-    wiki_views_recent: int | None = None  # trailing ~30d pageviews (drives price)
+    wiki_views_recent: int | None = None  # decayed attention, 60d half-life
+    wiki_views_short: int | None = None   # decayed attention, 7d half-life (momentum)
+    age: float = 26.0
 
 
 @dataclass
@@ -86,6 +88,7 @@ class PricedPlayer:
     game_score: float
     tier: str
     wiki_views: int | None = None
+    factors: dict = field(default_factory=dict)
     stats: dict = field(default_factory=dict)
 
 
@@ -141,50 +144,23 @@ def qualifies(p: PlayerInputs) -> bool:
     return p.games_played >= MIN_GAMES and p.minutes >= MIN_MINUTES
 
 
-def price_players(players: list[PlayerInputs]) -> list[PricedPlayer]:
-    """Price every qualified player against the league distribution."""
+def price_players(players: list[PlayerInputs], phase: str | None = None) -> list[PricedPlayer]:
+    """Price every qualified player via the multi-factor engine (factors.py):
+    each factor is z-scored across the pool and combined with season-phase
+    weights. Offseason weights damp the volatile factors so prices stay
+    deliberately calm between seasons."""
+    from . import factors as factor_engine
+
     pool = [p for p in players if qualifies(p)]
     if not pool:
         return []
 
-    gs = [game_score(p) for p in pool]
-    perf_z = _zscores(gs)
-    star_z = _zscores([star_power(p) for p in pool])
-
-    # Popularity: real attention (log pageviews — fame is power-law) blended
-    # with on-court star power. Recent (trailing ~30d) views drive the price
-    # when available so attention swings actually move the market; season
-    # totals are the fallback. Players missing pageview data get the pool
-    # median so they aren't punished for a bad name→article match.
-    def _views(p: PlayerInputs) -> int | None:
-        return p.wiki_views_recent if p.wiki_views_recent is not None else p.wiki_views
-
-    with_views = [_views(p) for p in pool if _views(p)]
-    if with_views:
-        median_views = sorted(with_views)[len(with_views) // 2]
-        wiki_z = _zscores(
-            [math.log10((_views(p) or median_views) + 1) for p in pool]
-        )
-        pop_z = [0.65 * w + 0.35 * s for w, s in zip(wiki_z, star_z)]
-    else:
-        pop_z = star_z
-
-    team_z = _zscores([p.team_win_pct for p in pool])
-
-    mom_raw = [
-        (p.last10_game_score - g) if p.last10_game_score is not None else 0.0
-        for p, g in zip(pool, gs)
-    ]
-    mom_z = _zscores(mom_raw)
+    composites, breakdown = factor_engine.compute(pool, phase)
 
     priced: list[PricedPlayer] = []
-    for i, p in enumerate(pool):
-        composite = (
-            W_PERF * perf_z[i]
-            + W_POP * pop_z[i]
-            + W_TEAM * team_z[i]
-            + W_MOM * mom_z[i]
-        )
+    for p in pool:
+        composite = composites[p.player_id]
+        fz = breakdown[p.player_id]
         price = BASE_PRICE * math.exp(SPREAD * composite)
         price = max(MIN_PRICE, min(MAX_PRICE, round(price, 2)))
         priced.append(
@@ -195,13 +171,14 @@ def price_players(players: list[PlayerInputs]) -> list[PricedPlayer]:
                 team_abbr=p.team_abbr,
                 price=price,
                 composite=round(composite, 4),
-                perf_z=round(perf_z[i], 4),
-                pop_z=round(pop_z[i], 4),
-                team_z=round(team_z[i], 4),
-                momentum_z=round(mom_z[i], 4),
-                game_score=round(gs[i], 2),
+                perf_z=fz["performance"],
+                pop_z=fz["popularity"],
+                team_z=fz["team"],
+                momentum_z=fz["momentum"],
+                game_score=round(game_score(p), 2),
                 tier=_tier(composite),
                 wiki_views=p.wiki_views,
+                factors=fz,
                 stats={
                     "gp": p.games_played,
                     "min": p.minutes,
