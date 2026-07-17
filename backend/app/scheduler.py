@@ -12,6 +12,9 @@ independent loops, all writing to the store:
             and flip tempo to `live` for a window
   plays     minute-by-minute notable plays (games.py) while games are live —
             dunks, alley-oops, blocks, clutch threes, straight into the feed
+  rosters   ESPN live rosters vs stored teams every 6h — offseason trades
+            and signings reassign the player, reprice both rosters, and
+            land in the feed ("Roster move: LeBron James → MIA")
   career    slow info-dump aggregator (profile.py) — one player per cycle,
             full league every ~5 weeks: career awards, highlights, draft,
             schools, medals, bio, shot zones
@@ -53,6 +56,7 @@ NEWS_SECONDS = 900
 SIGNALS_SECONDS = 120
 PLAYS_SECONDS = 20      # play-by-play cadence while games are live
 PLAYS_IDLE_SECONDS = 300  # how often to re-check when nothing is live
+ROSTERS_HOURS = 6  # offseason moves land within hours of being official
 CAREER_SECONDS = 7200   # one player's career/profile re-aggregated per cycle
                         # (~400 priced players -> full league every ~5 weeks)
 SEASON = ingest.DEFAULT_SEASON
@@ -154,6 +158,34 @@ async def _plays_loop() -> None:
         await asyncio.sleep(PLAYS_SECONDS if live else PLAYS_IDLE_SECONDS)
 
 
+async def _rosters_loop() -> None:
+    """Roster truth: compare stored teams against ESPN's live rosters and
+    apply trades/signings the moment they're official. A move reprices the
+    player AND both rosters (team, direction, teammate-quality factors)."""
+    while True:
+        try:
+            if _hours_since(store.get_meta("last_rosters_check")) >= ROSTERS_HOURS:
+                _, team_of = await asyncio.to_thread(ingest.fetch_espn_rosters)
+                if team_of:
+                    moves = await asyncio.to_thread(
+                        store.apply_roster_moves, SEASON, team_of
+                    )
+                    for m in moves:
+                        store.add_event(
+                            SEASON, m["player_id"], m["name"], "signal",
+                            f"Roster move: {m['name']} → {m['to']} (from {m['from']})",
+                        )
+                        store.mark_priority(SEASON, [m["player_id"]])
+                    if moves:
+                        log.info("rosters: %d moves applied", len(moves))
+                store.set_meta(
+                    "last_rosters_check", datetime.now(timezone.utc).isoformat()
+                )
+        except Exception:
+            log.exception("roster check failed")
+        await asyncio.sleep(3600)
+
+
 async def _career_loop() -> None:
     """Slow info-dump aggregator: every cycle, rebuild one player's full
     scouting profile — career awards (bbref bling), Wikipedia highlights,
@@ -189,5 +221,5 @@ async def _reprice_loop() -> None:
 async def run() -> None:
     await asyncio.gather(
         _trickle_loop(), _stats_loop(), _news_loop(), _signals_loop(),
-        _plays_loop(), _career_loop(), _reprice_loop(),
+        _plays_loop(), _career_loop(), _rosters_loop(), _reprice_loop(),
     )

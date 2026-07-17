@@ -239,6 +239,47 @@ def add_event(
         )
 
 
+def apply_roster_moves(season: str, team_of: dict[str, str]) -> list[dict]:
+    """Reassign players whose CURRENT team (ESPN rosters) differs from the
+    stored one — the offseason trade/signing repricing path. The moved
+    player inherits the new team's win%% (median of its current players) so
+    the team factors reflect where they play now, not where they used to.
+    Returns the moves applied."""
+    from .ingest import _normalize_name
+
+    with _lock, _conn() as conn:
+        rows = [dict(r) for r in conn.execute(
+            "SELECT player_id, name, team_abbr, team_win_pct FROM players WHERE season = ?",
+            (season,),
+        )]
+        # median win% per stored team, for assigning to arrivals
+        by_team: dict[str, list[float]] = {}
+        for r in rows:
+            by_team.setdefault(r["team_abbr"], []).append(r["team_win_pct"])
+        team_wpct = {
+            t: sorted(v)[len(v) // 2] for t, v in by_team.items() if v
+        }
+
+        moves = []
+        for r in rows:
+            new_team = team_of.get(_normalize_name(r["name"]))
+            if not new_team or new_team == r["team_abbr"]:
+                continue
+            conn.execute(
+                "UPDATE players SET team_abbr = ?, team_win_pct = ? "
+                "WHERE season = ? AND player_id = ?",
+                (new_team, team_wpct.get(new_team, r["team_win_pct"]),
+                 season, r["player_id"]),
+            )
+            moves.append({
+                "player_id": r["player_id"], "name": r["name"],
+                "from": r["team_abbr"], "to": new_team,
+            })
+        if moves:
+            _bump_data_version(conn)
+        return moves
+
+
 def mark_priority(season: str, player_ids: list[int]) -> None:
     """Jump these players to the front of the attention-trickle queue
     (NULL timestamps sort first in stalest_players)."""

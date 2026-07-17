@@ -94,38 +94,56 @@ ESPN_TEAMS_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/t
 ESPN_ROSTER_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team_id}/roster"
 
 
+# ESPN's team abbreviations that differ from the NBA standard
+ESPN_TO_NBA_ABBR = {"GS": "GSW", "NO": "NOP", "NY": "NYK", "SA": "SAS",
+                    "UTAH": "UTA", "WSH": "WAS"}
+
+
+def fetch_espn_rosters() -> tuple[dict[str, str], dict[str, str]]:
+    """(normalized name -> espn athlete id, normalized name -> NBA team abbr)
+    from the 30 current roster pages. This is the CURRENT roster truth —
+    offseason trades/signings show up here months before they appear in any
+    stats table."""
+    ids: dict[str, str] = {}
+    team_of: dict[str, str] = {}
+    teams = requests.get(ESPN_TEAMS_URL, headers=BROWSER_HEADERS, timeout=20)
+    teams.raise_for_status()
+    team_ids = [
+        t["team"]["id"]
+        for t in teams.json()["sports"][0]["leagues"][0]["teams"]
+    ]
+    for tid in team_ids:
+        r = requests.get(
+            ESPN_ROSTER_URL.format(team_id=tid), headers=BROWSER_HEADERS, timeout=20
+        )
+        if r.status_code != 200:
+            continue
+        data = r.json()
+        raw_abbr = (data.get("team", {}).get("abbreviation") or "").upper()
+        abbr = ESPN_TO_NBA_ABBR.get(raw_abbr, raw_abbr)
+        for a in data.get("athletes", []):
+            if a.get("displayName") and a.get("id"):
+                norm = _normalize_name(a["displayName"])
+                ids[norm] = str(a["id"])
+                if abbr:
+                    team_of[norm] = abbr
+        time.sleep(0.25)
+    return ids, team_of
+
+
 def espn_id_index() -> dict[str, str]:
     """Normalized player name -> ESPN athlete id, cached on disk. Used for
-    headshot fallback and to tie news articles to players. Aggregated from
-    the 30 team roster pages — ESPN's athlete index endpoint is partial."""
+    headshot fallback and to tie news articles to players."""
     path = DATA_DIR / "espn_ids.json"
     if path.exists():
         return json.loads(path.read_text())
-    ids: dict[str, str] = {}
     try:
-        teams = requests.get(ESPN_TEAMS_URL, headers=BROWSER_HEADERS, timeout=20)
-        teams.raise_for_status()
-        team_ids = [
-            t["team"]["id"]
-            for t in teams.json()["sports"][0]["leagues"][0]["teams"]
-        ]
-        for tid in team_ids:
-            r = requests.get(
-                ESPN_ROSTER_URL.format(team_id=tid),
-                headers=BROWSER_HEADERS,
-                timeout=20,
-            )
-            if r.status_code != 200:
-                continue
-            for a in r.json().get("athletes", []):
-                if a.get("displayName") and a.get("id"):
-                    ids[_normalize_name(a["displayName"])] = str(a["id"])
-            time.sleep(0.25)
+        ids, _ = fetch_espn_rosters()
     except (requests.RequestException, KeyError):
-        if not ids:
-            return {}
-    path.parent.mkdir(exist_ok=True)
-    path.write_text(json.dumps(ids))
+        return {}
+    if ids:
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(json.dumps(ids))
     return ids
 
 
