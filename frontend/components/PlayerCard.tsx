@@ -98,7 +98,7 @@ export default function PlayerCard({ player }: { player: Player }) {
     <div className="group overflow-hidden rounded-xl bg-[var(--surface-1)] transition-transform duration-150 hover:-translate-y-0.5">
       {/* Team-color banner: duotone gradient + halftone texture, cutout on top */}
       <div
-        className="relative h-28"
+        className="shine relative h-28"
         style={{
           background: `radial-gradient(120% 160% at 85% -20%, ${colors.secondary}66 0%, transparent 50%), linear-gradient(150deg, ${colors.primary} 0%, ${colors.primary}dd 55%, #0c0e11 130%)`,
         }}
@@ -175,6 +175,14 @@ export default function PlayerCard({ player }: { player: Player }) {
           <span className="h-2 w-2 rounded-full" style={{ background: TIER_COLOR[player.tier] }} />
           {player.tier}
         </span>
+
+        {/* racing stripe: one crisp accent line over the carbon */}
+        <div
+          className="absolute inset-x-0 bottom-0 h-[2px]"
+          style={{
+            background: `linear-gradient(90deg, ${colors.secondary} 0%, ${colors.secondary} 55%, transparent 95%)`,
+          }}
+        />
       </div>
 
       <div className="p-4 pt-3">

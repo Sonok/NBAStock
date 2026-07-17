@@ -19,27 +19,30 @@
 }
 
 body {
-  /* Carbon black steel: a faint carbon-fiber weave under a cold top sheen.
-     Texture sits at ~2-4% contrast so data surfaces stay clean on top. */
+  /* Clear-coated carbon: a 2x2 diagonal twill weave (crossing 45° threads)
+     under a broad lacquer sheen, like gloss carbon on a car body. Texture
+     sits at ~3% contrast so data surfaces stay clean on top. */
   background-color: var(--page);
   background-image:
-    linear-gradient(180deg, rgba(151, 168, 190, 0.05) 0%, transparent 22rem),
-    radial-gradient(rgba(0, 0, 0, 0.5) 15%, transparent 16%),
-    radial-gradient(rgba(0, 0, 0, 0.5) 15%, transparent 16%),
-    radial-gradient(rgba(200, 210, 224, 0.03) 15%, transparent 20%),
-    radial-gradient(rgba(200, 210, 224, 0.03) 15%, transparent 20%);
-  background-size:
-    100% 100%,
-    14px 14px,
-    14px 14px,
-    14px 14px,
-    14px 14px;
-  background-position:
-    0 0,
-    0 0,
-    7px 7px,
-    0 1px,
-    7px 8px;
+    linear-gradient(
+      115deg,
+      transparent 0%,
+      rgba(160, 180, 205, 0.04) 38%,
+      rgba(205, 220, 240, 0.075) 50%,
+      rgba(160, 180, 205, 0.04) 62%,
+      transparent 100%
+    ),
+    repeating-linear-gradient(
+      45deg,
+      rgba(210, 222, 240, 0.032) 0 1px,
+      transparent 1px 5px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(0, 0, 0, 0.55) 0 1px,
+      transparent 1px 5px
+    ),
+    linear-gradient(180deg, rgba(151, 168, 190, 0.05) 0%, transparent 24rem);
   background-attachment: fixed;
   color: var(--text-primary);
   font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -59,11 +62,51 @@ body {
 .panel {
   border-radius: 0.5rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, #1b1e22 0%, #131518 100%);
+  /* clear-coat pass: a faint diagonal specular over the plate gradient */
+  background:
+    linear-gradient(
+      115deg,
+      transparent 30%,
+      rgba(205, 220, 240, 0.03) 46%,
+      rgba(205, 220, 240, 0.05) 50%,
+      rgba(205, 220, 240, 0.03) 54%,
+      transparent 70%
+    ),
+    linear-gradient(180deg, #1b1e22 0%, #131518 100%);
   box-shadow:
     inset 0 1px 0 rgba(220, 230, 245, 0.07),
     inset 0 -1px 0 rgba(0, 0, 0, 0.55),
     0 10px 28px -18px rgba(0, 0, 0, 0.9);
+}
+
+/* Clear-coat shine: a light band sweeps across on hover, like sunlight
+   moving over lacquered carbon. Apply to a child of a .group container. */
+.shine {
+  position: relative;
+  overflow: hidden;
+}
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.14) 50%,
+    transparent 58%
+  );
+  transform: translateX(-130%);
+  transition: transform 0.7s ease;
+  pointer-events: none;
+}
+.group:hover .shine::after,
+.shine:hover::after {
+  transform: translateX(130%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .shine::after {
+    display: none;
+  }
 }
 
 /* Price line draws itself once on load */

@@ -88,7 +88,7 @@ export default function PlayerPage() {
       {/* Letterman hero: team-color jacket, giant cutout, varsity type */}
       <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--border-hairline)]">
         <div
-          className="relative h-64"
+          className="shine relative h-64"
           style={{
             background: `radial-gradient(120% 170% at 85% -20%, ${colors.secondary}59 0%, transparent 50%), linear-gradient(150deg, ${colors.primary} 0%, ${colors.primary}dd 55%, #0a0b0d 135%)`,
           }}
@@ -134,6 +134,15 @@ export default function PlayerPage() {
               {player.name.split(" ").slice(1).join(" ") || player.name}
             </h1>
           </div>
+
+          {/* racing stripe: one crisp accent line over the carbon */}
+          <div
+            className="absolute inset-x-0 bottom-0 h-[3px]"
+            style={{
+              background: `linear-gradient(90deg, ${colors.secondary} 0%, ${colors.secondary} 60%, transparent 96%)`,
+              boxShadow: `0 0 12px ${colors.secondary}66`,
+            }}
+          />
         </div>
 
         {/* patch row — sewn under the banner like a jacket chest */}
