@@ -130,7 +130,15 @@ export default function PlayerPage() {
                 </span>
               )}
             </p>
-            <h1 className="mt-0.5 truncate text-5xl font-black uppercase leading-none tracking-tight text-white [text-shadow:0_2px_6px_rgba(0,0,0,0.55)]">
+            <h1
+              className={`mt-0.5 truncate font-black uppercase leading-none tracking-tight text-white [text-shadow:0_2px_6px_rgba(0,0,0,0.55)] ${
+                (player.name.split(" ").slice(1).join(" ") || player.name).length >= 15
+                  ? "text-2xl sm:text-3xl"
+                  : (player.name.split(" ").slice(1).join(" ") || player.name).length >= 10
+                    ? "text-3xl sm:text-4xl"
+                    : "text-4xl sm:text-5xl"
+              }`}
+            >
               {player.name.split(" ").slice(1).join(" ") || player.name}
             </h1>
           </div>

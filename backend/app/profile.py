@@ -265,17 +265,54 @@ def _career_from_wikitext(content: str) -> dict:
         today = date.today()
         out["age"] = today.year - y - ((today.month, today.day) < (mo, d))
 
+    def raw_field(name: str) -> str:
+        fm = re.search(r"\|\s*" + name + r"\s*=\s*(.+)", content)
+        return fm.group(1) if fm else ""
+
+    # Height/weight appear as separate imperial fields, metric fields, or a
+    # {{convert|...}} template — handle all three.
     ft, inch = field("height_ft"), field("height_in")
+    raw_h = raw_field("height")
     if ft:
         out["height"] = f"{ft}'{inch or 0}\""
-    lb = field("weight_lb") or field("weight_lbs")
-    if lb:
-        out["weight"] = f"{lb} lb"
+    elif m2 := re.search(r"\{\{convert\|(\d+)\|ft\|(\d+)", raw_h):
+        out["height"] = f"{m2.group(1)}'{m2.group(2)}\""
+    else:
+        meters = field("height_m") or (
+            m3.group(1) if (m3 := re.search(r"\{\{convert\|([\d.]+)\|m\b", raw_h)) else None
+        )
+        try:
+            total_in = round(float(meters) * 39.3701) if meters else None
+        except ValueError:
+            total_in = None
+        if total_in:
+            out["height"] = f"{total_in // 12}'{total_in % 12}\""
 
-    start = field("career_start")
-    if start and start.isdigit():
-        from datetime import date
-        out["years_pro"] = max(date.today().year - int(start), 0)
+    raw_w = raw_field("weight")
+    lb = field("weight_lb") or field("weight_lbs")
+    if not lb and (m4 := re.search(r"\{\{convert\|([\d.]+)\|lb", raw_w)):
+        lb = m4.group(1)
+    if lb:
+        out["weight"] = f"{round(float(lb))} lb"
+    else:
+        kg = field("weight_kg") or (
+            m5.group(1) if (m5 := re.search(r"\{\{convert\|([\d.]+)\|kg", raw_w)) else None
+        )
+        try:
+            out["weight"] = f"{round(float(kg) * 2.20462)} lb" if kg else None
+        except (ValueError, TypeError):
+            pass
+
+    # NBA experience: from draft year when drafted (career_start is the
+    # player's PRO debut, which for internationals predates the NBA —
+    # Wembanyama went pro in France in 2019 but is a 2023 draftee)
+    from datetime import date
+    if year and year.isdigit():
+        out["years_pro"] = max(date.today().year - int(year), 0)
+    else:
+        start = field("career_start")
+        if start and start.isdigit():
+            out["years_pro"] = max(date.today().year - int(start), 0)
 
     for metal, body in re.findall(
         r"\{\{Medal(Gold|Silver|Bronze)\s*\|(.*?)\}\}", content, re.S
