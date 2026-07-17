@@ -145,6 +145,43 @@ export default function PlayerPage() {
           />
         </div>
 
+        {/* tale of the tape — vitals strip right under the banner */}
+        {profile?.career && (
+          <div className="flex flex-wrap items-center gap-x-0 gap-y-1 border-b border-[var(--border-hairline)] bg-[var(--surface-1)] px-6 py-2.5">
+            {[
+              ["Pos", profile.career.position],
+              [
+                "Size",
+                profile.career.height &&
+                  `${profile.career.height}${profile.career.weight ? ` · ${profile.career.weight}` : ""}`,
+              ],
+              ["Age", profile.career.age != null ? String(profile.career.age) : null],
+              ["From", profile.career.birth_place?.replace(/, U\.S\.$/, "")],
+              ["Draft", profile.career.draft?.replace(/^(\d{4}) draft · /, "'$1 ")],
+              [
+                "Exp",
+                profile.career.years_pro != null && profile.career.years_pro > 0
+                  ? `${profile.career.years_pro} yrs`
+                  : null,
+              ],
+            ]
+              .filter(([, v]) => v)
+              .map(([label, value], i) => (
+                <span
+                  key={label as string}
+                  className={`flex items-baseline gap-1.5 text-xs ${
+                    i > 0 ? "ml-4 border-l border-[var(--border-hairline)] pl-4" : ""
+                  }`}
+                >
+                  <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                    {label}
+                  </span>
+                  <span className="font-medium text-[var(--text-secondary)]">{value}</span>
+                </span>
+              ))}
+          </div>
+        )}
+
         {/* patch row — sewn under the banner like a jacket chest */}
         <div className="flex flex-wrap items-center justify-between gap-4 bg-[var(--surface-1)] px-6 py-4">
           {profile?.career?.patches?.length ? (
@@ -324,26 +361,7 @@ export default function PlayerPage() {
               {profile.career && (
                 <div className="mt-3 space-y-1.5 border-t border-[var(--border-hairline)] pt-3 text-xs text-[var(--text-secondary)]">
                   {profile.career.born && (
-                    <p>
-                      <span className="text-[var(--text-muted)]">Born</span> · {profile.career.born}
-                      {profile.career.age != null && ` (age ${profile.career.age})`}
-                    </p>
-                  )}
-                  {profile.career.birth_place && (
-                    <p><span className="text-[var(--text-muted)]">From</span> · {profile.career.birth_place.replace(/, U\.S\.$/, "")}</p>
-                  )}
-                  {profile.career.position && (
-                    <p>
-                      <span className="text-[var(--text-muted)]">Position</span> · {profile.career.position}
-                      {profile.career.height && ` · ${profile.career.height}`}
-                      {profile.career.weight && `, ${profile.career.weight}`}
-                    </p>
-                  )}
-                  {profile.career.years_pro != null && profile.career.years_pro > 0 && (
-                    <p><span className="text-[var(--text-muted)]">Experience</span> · {profile.career.years_pro} years pro</p>
-                  )}
-                  {profile.career.draft && (
-                    <p><span className="text-[var(--text-muted)]">Draft</span> · {profile.career.draft.replace(/^\d{4} draft · /, "")} ({profile.career.draft.slice(0, 4)})</p>
+                    <p><span className="text-[var(--text-muted)]">Born</span> · {profile.career.born}</p>
                   )}
                   {profile.career.college && (
                     <p><span className="text-[var(--text-muted)]">College</span> · {profile.career.college}</p>
