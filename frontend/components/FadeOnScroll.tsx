@@ -14,7 +14,7 @@ export default function FadeOnScroll({ children }: { children: React.ReactNode }
     const onScroll = () => {
       setScrolling(true);
       clearTimeout(timer.current);
-      timer.current = setTimeout(() => setScrolling(false), 400);
+      timer.current = setTimeout(() => setScrolling(false), 120);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
@@ -25,8 +25,10 @@ export default function FadeOnScroll({ children }: { children: React.ReactNode }
 
   return (
     <div
-      className={`transition-opacity duration-500 ease-out ${
-        scrolling ? "lg:pointer-events-none lg:opacity-0" : "opacity-100"
+      className={`transition-opacity ease-out ${
+        scrolling
+          ? "duration-300 lg:pointer-events-none lg:opacity-0"
+          : "duration-150 opacity-100"
       }`}
     >
       {children}
