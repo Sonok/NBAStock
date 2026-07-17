@@ -170,12 +170,16 @@ async def _rosters_loop() -> None:
                     moves = await asyncio.to_thread(
                         store.apply_roster_moves, SEASON, team_of
                     )
+                    prices = store.price_map(SEASON)
                     for m in moves:
-                        store.add_event(
-                            SEASON, m["player_id"], m["name"], "signal",
-                            f"Roster move: {m['name']} → {m['to']} (from {m['from']})",
-                        )
                         store.mark_priority(SEASON, [m["player_id"]])
+                        # every move reprices; only rotation-player moves are
+                        # wire-worthy (feed editorial rule: stories, not noise)
+                        if prices.get(m["player_id"], 0) >= 30:
+                            store.add_event(
+                                SEASON, m["player_id"], m["name"], "signal",
+                                f"Roster move: {m['name']} → {m['to']} (from {m['from']})",
+                            )
                     if moves:
                         log.info("rosters: %d moves applied", len(moves))
                 store.set_meta(
