@@ -335,8 +335,10 @@ def get_daily_views(season: str) -> dict[str, dict[str, int]]:
 
 
 def player_inputs(season: str) -> list[PlayerInputs]:
+    from . import popularity
+
     totals = view_totals(season)
-    recent = view_totals(season, days=30)
+    decayed = popularity.decayed_attention(get_daily_views(season))
     return [
         PlayerInputs(
             player_id=r["player_id"],
@@ -364,7 +366,8 @@ def player_inputs(season: str) -> list[PlayerInputs]:
             triple_doubles=int(r["td3"]),
             plus_minus=r["plus_minus"],
             wiki_views=totals.get(r["player_id"]) or None,
-            wiki_views_recent=recent.get(r["player_id"]) or None,
+            wiki_views_recent=(round(decayed[str(r["player_id"])]) or None)
+            if str(r["player_id"]) in decayed else None,
         )
         for r in get_players(season)
     ]

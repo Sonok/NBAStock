@@ -3,8 +3,9 @@
 The performance/team components move on game nights, but the popularity
 component moves every single day — Wikipedia attention swings with games,
 trades, injuries, and rumors, even in the offseason. So the daily price
-series recomputes the model with popularity measured over a trailing window
-ending on each day, holding performance/team at season level.
+series recomputes the model with popularity measured as an exponentially
+decayed attention stock on each day, holding performance/team at season
+level.
 
 Each player's series is then anchored (scaled) so its final point equals the
 official market price from pricing.price_players — one price rules trading,
@@ -32,7 +33,6 @@ from .pricing import (
     star_power,
 )
 
-TRAILING_DAYS = 30  # attention window feeding each day's popularity score
 HISTORY_DAYS = 120  # how far back the served series goes
 
 
@@ -66,18 +66,21 @@ def daily_prices(season: str = ingest.DEFAULT_SEASON) -> dict:
     all_dates = [d for d in all_dates if d <= last_with_data]
     out_dates = all_dates[-HISTORY_DAYS:]
 
-    # Per-player aligned cumulative view counts for O(1) trailing sums.
-    cums: list[list[int] | None] = []
+    # Exponentially-decayed attention per player per day — the same model
+    # that drives the live price (S_t = S_(t-1) * lambda + views_t).
+    lam = 0.5 ** (1.0 / popularity.DECAY_HALF_LIFE_DAYS)
+    decayed: list[list[float] | None] = []
     for p in pool:
         series = daily.get(str(p.player_id))
         if not series:
-            cums.append(None)
+            decayed.append(None)
             continue
-        cum, total = [], 0
+        vals: list[float] = []
+        s_val = 0.0
         for d in all_dates:
-            total += series.get(d, 0)
-            cum.append(total)
-        cums.append(cum)
+            s_val = s_val * lam + series.get(d, 0)
+            vals.append(s_val)
+        decayed.append(vals)
 
     # Static components (move on game nights, which we don't have per-day).
     perf_z = _zscores([game_score(p) for p in pool])
@@ -88,14 +91,11 @@ def daily_prices(season: str = ingest.DEFAULT_SEASON) -> dict:
     date_index = {d: i for i, d in enumerate(all_dates)}
     for d in out_dates:
         i = date_index[d]
-        j = max(0, i - TRAILING_DAYS)
-        trailing = [
-            (cum[i] - cum[j]) if cum is not None else None for cum in cums
-        ]
-        known = sorted(t for t in trailing if t)
+        att = [dec[i] if dec is not None else None for dec in decayed]
+        known = sorted(t for t in att if t)
         median = known[len(known) // 2] if known else 0
         wiki_z = _zscores(
-            [math.log10((t if t else median) + 1) for t in trailing]
+            [math.log10((t if t else median) + 1) for t in att]
         )
         for k, p in enumerate(pool):
             pop_z = 0.65 * wiki_z[k] + 0.35 * star_z[k]

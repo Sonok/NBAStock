@@ -32,9 +32,42 @@ API = (
 )
 # Wikimedia asks for a descriptive User-Agent with contact info.
 HEADERS = {"User-Agent": "NBAStock/0.1 (student project; ctmahapa95@gmail.com)"}
+DECAY_HALF_LIFE_DAYS = 60  # attention is a decaying stock, not a window:
+                           # a Finals run keeps ~2/3 of its weight a month on
 WORKERS = 4  # Wikimedia throttles aggressive anonymous clients
 TIMEOUT = 15
 MAX_RETRIES = 4
+
+
+def decayed_attention(daily: dict[str, dict[str, int]]) -> dict[str, float]:
+    """player_id_str -> exponentially-decayed view sum as of the newest date
+    in the dataset. S_t = S_(t-1) * lambda + views_t, with lambda set by
+    DECAY_HALF_LIFE_DAYS. Smooth momentum without a window cliff."""
+    from datetime import date as _date
+
+    lam = 0.5 ** (1.0 / DECAY_HALF_LIFE_DAYS)
+
+    def to_ord(d: str) -> int:
+        return _date(int(d[:4]), int(d[4:6]), int(d[6:8])).toordinal()
+
+    latest = max((max(s) for s in daily.values() if s), default=None)
+    if latest is None:
+        return {}
+    latest_o = to_ord(latest)
+
+    out: dict[str, float] = {}
+    for pid, series in daily.items():
+        s_val, last_o = 0.0, None
+        for d in sorted(series):
+            o = to_ord(d)
+            if last_o is not None:
+                s_val *= lam ** (o - last_o)
+            s_val += series[d]
+            last_o = o
+        if last_o is not None:
+            s_val *= lam ** (latest_o - last_o)
+        out[pid] = s_val
+    return out
 
 
 def cache_path(season: str) -> Path:
