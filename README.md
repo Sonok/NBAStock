@@ -30,6 +30,11 @@ process (`app/scheduler.py`) keeps it fresh — no batch-and-restart:
 - **stats** — Basketball-Reference refresh once a day (stale ids pruned)
 - **news** — ESPN NBA headlines every 15 min into the events feed, tied to
   players via ESPN's roster ids when the article tags an athlete
+- **plays** — minute-by-minute game moments (`app/games.py`): while games
+  are live, ESPN play-by-play is polled every 20s and notable plays (dunks,
+  alley-oops, blocks, clutch 4th-quarter threes) land in the feed within
+  seconds, attributed to the player (blockers credited, not shooters).
+  Idle all offseason; wakes automatically with the game-window detector.
 - **signals** — pluggable event detectors (`app/signals.py`): trade/injury/
   signing language in headlines, per-player attention spikes vs their own
   baseline, and live games via ESPN's scoreboard. A firing signal jumps the

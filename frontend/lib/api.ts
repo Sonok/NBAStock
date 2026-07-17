@@ -70,7 +70,7 @@ export interface MarketEvent {
   ts: string;
   player_id: number;
   name: string;
-  type: "price_move" | "news" | "signal";
+  type: "price_move" | "news" | "signal" | "play";
   message: string;
   delta_pct: number | null;
   url: string | null;

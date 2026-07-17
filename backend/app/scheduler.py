@@ -10,6 +10,8 @@ independent loops, all writing to the store:
   signals   pluggable event detectors (signals.py) — trade/injury buzz,
             attention spikes, live games; they front-run the trickle queue
             and flip tempo to `live` for a window
+  plays     minute-by-minute notable plays (games.py) while games are live —
+            dunks, alley-oops, blocks, clutch threes, straight into the feed
   reprice   EVENT-DRIVEN, not wall-clock: collectors bump a data_version
             in the store; this loop polls the version and only reprices
             when inputs actually changed. A quiet offseason night produces
@@ -34,7 +36,7 @@ from datetime import datetime, timezone
 
 import requests
 
-from . import ingest, market, news, popularity, signals, store
+from . import games, ingest, market, news, popularity, signals, store
 
 log = logging.getLogger("nbastock.scheduler")
 
@@ -46,6 +48,8 @@ TEMPOS = {
 STATS_HOURS = 24
 NEWS_SECONDS = 900
 SIGNALS_SECONDS = 120
+PLAYS_SECONDS = 20      # play-by-play cadence while games are live
+PLAYS_IDLE_SECONDS = 300  # how often to re-check when nothing is live
 SEASON = ingest.DEFAULT_SEASON
 
 
@@ -129,6 +133,22 @@ async def _signals_loop() -> None:
         await asyncio.sleep(SIGNALS_SECONDS)
 
 
+async def _plays_loop() -> None:
+    """Minute-by-minute game moments. The game-window detector maintains the
+    games_live flag; while it's set, poll every game's play-by-play on a
+    tight cadence and surface notable plays (dunks, blocks, clutch threes)."""
+    while True:
+        live = store.get_meta("games_live") == "1"
+        if live:
+            try:
+                added = await asyncio.to_thread(games.collect_live, SEASON)
+                if added:
+                    log.info("plays: %d notable plays", added)
+            except Exception:
+                log.exception("plays collection failed")
+        await asyncio.sleep(PLAYS_SECONDS if live else PLAYS_IDLE_SECONDS)
+
+
 async def _reprice_loop() -> None:
     last_version = store.get_meta("data_version")
     while True:
@@ -146,5 +166,6 @@ async def _reprice_loop() -> None:
 
 async def run() -> None:
     await asyncio.gather(
-        _trickle_loop(), _stats_loop(), _news_loop(), _signals_loop(), _reprice_loop()
+        _trickle_loop(), _stats_loop(), _news_loop(), _signals_loop(),
+        _plays_loop(), _reprice_loop(),
     )
