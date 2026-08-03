@@ -11,6 +11,9 @@ frontend/node_modules/
 frontend/.next/
 frontend/out/
 
+# Secrets
+backend/.mongodb_uri
+
 # Env + OS
 .env*
 .DS_Store

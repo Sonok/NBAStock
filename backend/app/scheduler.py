@@ -42,7 +42,7 @@ from datetime import datetime, timezone
 
 import requests
 
-from . import games, ingest, market, news, popularity, profile, signals, store
+from . import cloudsync, games, ingest, market, news, popularity, profile, signals, store
 
 log = logging.getLogger("nbastock.scheduler")
 
@@ -57,6 +57,7 @@ SIGNALS_SECONDS = 120
 PLAYS_SECONDS = 20      # play-by-play cadence while games are live
 PLAYS_IDLE_SECONDS = 300  # how often to re-check when nothing is live
 ROSTERS_HOURS = 6  # offseason moves land within hours of being official
+CLOUD_PUSH_DAYS = 30  # monthly market publish to MongoDB Atlas (if configured)
 CAREER_SECONDS = 7200   # one player's career/profile re-aggregated per cycle
                         # (~400 priced players -> full league every ~5 weeks)
 SEASON = ingest.DEFAULT_SEASON
@@ -190,6 +191,25 @@ async def _rosters_loop() -> None:
         await asyncio.sleep(3600)
 
 
+async def _cloudsync_loop() -> None:
+    """Monthly publish of the whole market to MongoDB Atlas — the cloud copy
+    of the player database. No-op unless a connection string is configured
+    (MONGODB_URI env or backend/.mongodb_uri)."""
+    while True:
+        try:
+            if cloudsync._uri() and _hours_since(
+                store.get_meta("last_cloud_push")
+            ) >= CLOUD_PUSH_DAYS * 24:
+                summary = await asyncio.to_thread(cloudsync.push, SEASON)
+                store.set_meta(
+                    "last_cloud_push", datetime.now(timezone.utc).isoformat()
+                )
+                log.info("cloudsync: pushed %s", summary)
+        except Exception:
+            log.exception("cloud push failed")
+        await asyncio.sleep(6 * 3600)
+
+
 async def _career_loop() -> None:
     """Slow info-dump aggregator: every cycle, rebuild one player's full
     scouting profile — career awards (bbref bling), Wikipedia highlights,
@@ -225,5 +245,6 @@ async def _reprice_loop() -> None:
 async def run() -> None:
     await asyncio.gather(
         _trickle_loop(), _stats_loop(), _news_loop(), _signals_loop(),
-        _plays_loop(), _career_loop(), _rosters_loop(), _reprice_loop(),
+        _plays_loop(), _career_loop(), _rosters_loop(), _cloudsync_loop(),
+        _reprice_loop(),
     )
